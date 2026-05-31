@@ -511,8 +511,146 @@ model public_users {
   created_at        DateTime   @default(now()) @db.Timestamptz(6)
   updated_at        DateTime   @default(now()) @db.Timestamptz(6)
   users             auth_users @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  owned_patients    patients[] @relation("PatientOwner")
+  dentist_visits    visits[]   @relation("DentistVisits")
 
   @@map("users")
+  @@schema("public")
+}
+
+/// Patient record scoped to owner dentist. HN is unique per owner, not globally.
+model patients {
+  patient_id    String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  owner_user_id String      @db.Uuid
+  hn            String
+  first_name    String
+  last_name     String
+  age           Int?
+  nationality   String?
+  gender        gender_type?
+  note          String?     @db.Text
+  is_deleted    Boolean     @default(false)
+  created_at    DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime    @updatedAt @db.Timestamptz(6)
+
+  owner  public_users @relation("PatientOwner", fields: [owner_user_id], references: [user_id])
+  visits visits[]
+
+  @@unique([owner_user_id, hn])
+  @@index([owner_user_id])
+  @@schema("public")
+}
+
+model visits {
+  visit_id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  patient_id      String       @db.Uuid
+  dentist_user_id String       @db.Uuid
+  visit_date      DateTime     @db.Date
+  phase           visit_phase
+  doctor_name     String?
+  student_id      Int?
+  clinical_note   String?      @db.Text
+  status          visit_status @default(draft)
+  created_at      DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime     @updatedAt @db.Timestamptz(6)
+
+  patient            patients             @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
+  dentist            public_users         @relation("DentistVisits", fields: [dentist_user_id], references: [user_id])
+  periodontal_charts periodontal_charts[]
+
+  @@index([patient_id, visit_date(sort: Desc)])
+  @@index([dentist_user_id])
+  @@schema("public")
+}
+
+model periodontal_charts {
+  chart_id   String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  visit_id   String       @db.Uuid
+  chart_name String?
+  status     chart_status @default(draft)
+  is_active  Boolean      @default(true)
+  created_at DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at DateTime     @updatedAt @db.Timestamptz(6)
+
+  visit   visits                       @relation(fields: [visit_id], references: [visit_id], onDelete: Cascade)
+  teeth   periodontal_chart_teeth[]
+  summary periodontal_chart_summaries?
+
+  @@index([visit_id])
+  @@schema("public")
+}
+
+model periodontal_chart_teeth {
+  chart_tooth_id String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chart_id       String              @db.Uuid
+  tooth_number   Int                 @db.SmallInt
+  arch           tooth_arch
+  status         tooth_status        @default(present)
+  mobility       Int?                @db.SmallInt
+  prognosis_kc   prognosis_kc_level?
+  prognosis_mn   prognosis_mn_level?
+  tooth_note     String?             @db.Text
+
+  chart      periodontal_charts             @relation(fields: [chart_id], references: [chart_id], onDelete: Cascade)
+  surfaces   periodontal_tooth_surfaces[]
+  sites      periodontal_tooth_sites[]
+  furcations periodontal_tooth_furcations[]
+
+  @@unique([chart_id, tooth_number])
+  @@schema("public")
+}
+
+model periodontal_tooth_surfaces {
+  tooth_surface_id String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chart_tooth_id   String        @db.Uuid
+  surface          surface_group
+  ktw_mm           Decimal?      @db.Decimal(4, 1)
+
+  tooth periodontal_chart_teeth @relation(fields: [chart_tooth_id], references: [chart_tooth_id], onDelete: Cascade)
+
+  @@unique([chart_tooth_id, surface])
+  @@schema("public")
+}
+
+model periodontal_tooth_sites {
+  site_id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chart_tooth_id String        @db.Uuid
+  surface        surface_group
+  site_position  site_position
+  pd_mm          Int?
+  recession_mm   Int?
+  cal_mm         Int?
+  bop            Boolean       @default(false)
+  plaque         Boolean       @default(false)
+
+  tooth periodontal_chart_teeth @relation(fields: [chart_tooth_id], references: [chart_tooth_id], onDelete: Cascade)
+
+  @@unique([chart_tooth_id, surface, site_position])
+  @@schema("public")
+}
+
+model periodontal_tooth_furcations {
+  furcation_id   String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chart_tooth_id String          @db.Uuid
+  surface        surface_group
+  site_index     Int             @default(0) @db.SmallInt
+  grade          furcation_grade @default(none)
+
+  tooth periodontal_chart_teeth @relation(fields: [chart_tooth_id], references: [chart_tooth_id], onDelete: Cascade)
+
+  @@unique([chart_tooth_id, surface, site_index])
+  @@schema("public")
+}
+
+model periodontal_chart_summaries {
+  summary_id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chart_id          String   @unique @db.Uuid
+  total_teeth       Int?
+  bop_percentage    Decimal? @db.Decimal(5, 2)
+  plaque_percentage Decimal? @db.Decimal(5, 2)
+
+  chart periodontal_charts @relation(fields: [chart_id], references: [chart_id], onDelete: Cascade)
+
   @@schema("public")
 }
 
@@ -589,6 +727,102 @@ enum one_time_token_type {
 enum user_role {
   admin
   dentist
+
+  @@schema("public")
+}
+
+enum gender_type {
+  male
+  female
+  other
+
+  @@schema("public")
+}
+
+enum visit_phase {
+  before_hygienic
+  after_hygienic
+  after_corrective
+
+  @@schema("public")
+}
+
+enum visit_status {
+  draft
+  completed
+
+  @@schema("public")
+}
+
+enum chart_status {
+  draft
+  saved
+  locked
+
+  @@schema("public")
+}
+
+enum tooth_arch {
+  upper
+  lower
+
+  @@schema("public")
+}
+
+enum tooth_status {
+  present
+  missing
+  implant
+
+  @@schema("public")
+}
+
+enum prognosis_kc_level {
+  favorable
+  questionable
+  unfavorable
+  hopeless
+
+  @@schema("public")
+}
+
+enum prognosis_mn_level {
+  good
+  fair
+  poor
+  questionable
+  hopeless
+
+  @@schema("public")
+}
+
+enum site_position {
+  MB
+  B
+  DB
+  MP
+  P
+  DP
+  ML
+  L
+  DL
+
+  @@schema("public")
+}
+
+enum surface_group {
+  buccal
+  palatal
+  lingual
+
+  @@schema("public")
+}
+
+enum furcation_grade {
+  none
+  grade_1
+  grade_2
+  grade_3
 
   @@schema("public")
 }
