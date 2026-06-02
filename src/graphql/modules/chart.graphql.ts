@@ -9,6 +9,17 @@ import type { GraphQLContext } from "../context";
 import { requireAuth } from "../guards";
 
 export const chartTypeDefs = /* GraphQL */ `
+  type PatientInfo {
+    hn: String!
+    patientName: String!
+    age: Int
+    gender: String
+    nationality: String
+    date: String!
+    doctor: String
+    studentId: String
+  }
+
   type PeriodontalChart {
     id: ID!
     visitId: ID!
@@ -17,6 +28,7 @@ export const chartTypeDefs = /* GraphQL */ `
     teethData: JSON!
     summary: JSON
     updatedAt: String!
+    patientInfo: PatientInfo
   }
 
   input SaveChartInput {

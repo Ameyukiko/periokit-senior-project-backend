@@ -114,6 +114,18 @@ export const mapChartResponse = (
       }
     : null,
   updatedAt: chart.updated_at.toISOString(),
+  patientInfo: chart.visit?.patient
+    ? {
+        hn: chart.visit.patient.hn,
+        patientName: `${chart.visit.patient.first_name} ${chart.visit.patient.last_name}`.trim(),
+        age: chart.visit.patient.age ?? null,
+        gender: chart.visit.patient.gender ?? null,
+        nationality: chart.visit.patient.nationality ?? null,
+        date: chart.visit.visit_date.toISOString().split("T")[0],
+        doctor: chart.visit.doctor_name ?? null,
+        studentId: chart.visit.student_id != null ? String(chart.visit.student_id) : null,
+      }
+    : null,
 });
 
 // ---- helper: upsert chart rows inside a transaction ----
@@ -208,6 +220,7 @@ export const chartsRepository = {
       include: {
         teeth: { include: { surfaces: true, sites: true, furcations: true } },
         summary: true,
+        visit: { include: { patient: true } },
       },
     }),
 
@@ -221,7 +234,7 @@ export const chartsRepository = {
   upsertChart: (visitId: string, payload: ChartPayload) =>
     prisma.$transaction((tx) => upsertChartRows(tx, visitId, payload)),
 
-  // New: upsert patient → resolve/create visit → upsert chart, all in one transaction
+  // New: upsert patient -> resolve/create visit -> upsert chart, all in one transaction
   saveChartFull: (userId: string, input: SaveChartFullInput): Promise<string> =>
     prisma.$transaction(async (tx) => {
       // 1. Upsert patient by (owner_user_id, hn)
@@ -245,7 +258,7 @@ export const chartsRepository = {
         },
       });
 
-      // 2. Resolve visitId — use existing or create new
+      // 2. Resolve visitId -- use existing or create new
       let visitId: string;
       if (input.visitId) {
         const visit = await tx.visits.findUnique({ where: { visit_id: input.visitId } });
