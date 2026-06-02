@@ -565,7 +565,7 @@ model visits {
 
 model periodontal_charts {
   chart_id   String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  visit_id   String       @db.Uuid
+  visit_id   String       @unique @db.Uuid
   chart_name String?
   status     chart_status @default(draft)
   is_active  Boolean      @default(true)
@@ -576,7 +576,6 @@ model periodontal_charts {
   teeth   periodontal_chart_teeth[]
   summary periodontal_chart_summaries?
 
-  @@index([visit_id])
   @@schema("public")
 }
 
