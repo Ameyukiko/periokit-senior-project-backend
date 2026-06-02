@@ -66,6 +66,14 @@ export const patientsRepository = {
       },
       include: {
         _count: { select: { visits: true } },
+        visits: {
+          orderBy: { visit_date: "desc" },
+          include: {
+            periodontal_charts: {
+              select: { chart_id: true, status: true },
+            },
+          },
+        },
       },
     }),
 };
