@@ -2,7 +2,7 @@ import { GraphQLError } from "graphql";
 import { JSONResolver } from "graphql-scalars";
 import {
   chartsRepository,
-  type ChartPayload,
+  type SaveChartFullInput,
 } from "../../modules/charts/charts.repository";
 import { findVisitById } from "../../modules/visits/visits.repository";
 import type { GraphQLContext } from "../context";
@@ -20,9 +20,17 @@ export const chartTypeDefs = /* GraphQL */ `
   }
 
   input SaveChartInput {
-    visitId: ID!
+    visitId: ID
     chartName: String
     teethData: JSON!
+    patientHn: String!
+    patientFirstName: String!
+    patientLastName: String!
+    patientAge: Int
+    patientGender: String
+    patientNationality: String
+    visitDate: String!
+    visitPhase: String!
   }
 
   extend type Query {
@@ -36,16 +44,6 @@ export const chartTypeDefs = /* GraphQL */ `
 
 export { JSONResolver };
 
-const requireVisitOwnership = async (visitId: string, userId: string) => {
-  const visit = await findVisitById(visitId);
-  if (!visit || visit.dentist_user_id !== userId) {
-    throw new GraphQLError("Visit not found", {
-      extensions: { code: "NOT_FOUND" },
-    });
-  }
-  return visit;
-};
-
 export const chartResolvers = {
   Query: {
     chartByVisit: async (
@@ -54,7 +52,12 @@ export const chartResolvers = {
       context: GraphQLContext
     ) => {
       const { userId } = requireAuth(context);
-      await requireVisitOwnership(visitId, userId);
+      const visit = await findVisitById(visitId);
+      if (!visit || visit.dentist_user_id !== userId) {
+        throw new GraphQLError("Visit not found", {
+          extensions: { code: "NOT_FOUND" },
+        });
+      }
       return chartsRepository.findByVisitAndMap(visitId);
     },
   },
@@ -62,20 +65,42 @@ export const chartResolvers = {
   Mutation: {
     saveChart: async (
       _parent: unknown,
-      { input }: { input: { visitId: string; chartName?: string; teethData: ChartPayload } },
+      {
+        input,
+      }: {
+        input: {
+          visitId?: string;
+          chartName?: string;
+          teethData: SaveChartFullInput["teethData"];
+          patientHn: string;
+          patientFirstName: string;
+          patientLastName: string;
+          patientAge?: number;
+          patientGender?: string;
+          patientNationality?: string;
+          visitDate: string;
+          visitPhase: string;
+        };
+      },
       context: GraphQLContext
     ) => {
       const { userId } = requireAuth(context);
-      await requireVisitOwnership(input.visitId, userId);
 
-      const payload: ChartPayload = {
-        ...input.teethData,
-        chart_name: input.chartName ?? null,
-      };
+      const visitId = await chartsRepository.saveChartFull(userId, {
+        visitId: input.visitId ?? null,
+        chartName: input.chartName ?? null,
+        teethData: input.teethData,
+        patientHn: input.patientHn,
+        patientFirstName: input.patientFirstName,
+        patientLastName: input.patientLastName,
+        patientAge: input.patientAge ?? null,
+        patientGender: input.patientGender ?? null,
+        patientNationality: input.patientNationality ?? null,
+        visitDate: input.visitDate,
+        visitPhase: input.visitPhase,
+      });
 
-      await chartsRepository.upsertChart(input.visitId, payload);
-
-      const result = await chartsRepository.findByVisitAndMap(input.visitId);
+      const result = await chartsRepository.findByVisitAndMap(visitId);
       if (!result) {
         throw new GraphQLError("Chart not found after save", {
           extensions: { code: "INTERNAL_SERVER_ERROR" },
