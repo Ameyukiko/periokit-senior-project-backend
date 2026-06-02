@@ -1,5 +1,6 @@
 import { userResolvers, userTypeDefs } from "./modules/user.graphql";
 import { chartResolvers, chartTypeDefs, JSONResolver } from "./modules/chart.graphql";
+import { patientResolvers, patientTypeDefs } from "./modules/patient.graphql";
 
 export const typeDefs = /* GraphQL */ `
   scalar JSON
@@ -12,8 +13,11 @@ export const typeDefs = /* GraphQL */ `
     ok: Boolean!
     message: String!
   }
+
+  type Mutation
   ${userTypeDefs}
   ${chartTypeDefs}
+  ${patientTypeDefs}
 `;
 
 export const resolvers = {
@@ -25,6 +29,7 @@ export const resolvers = {
     }),
     ...userResolvers.Query,
     ...chartResolvers.Query,
+    ...patientResolvers.Query,
   },
   Mutation: {
     ...chartResolvers.Mutation,
