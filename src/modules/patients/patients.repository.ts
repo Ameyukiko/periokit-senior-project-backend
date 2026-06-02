@@ -56,4 +56,16 @@ export const patientsRepository = {
 
     return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
   },
+
+  findById: (patientId: string, ownerUserId: string) =>
+    prisma.patients.findFirst({
+      where: {
+        patient_id: patientId,
+        owner_user_id: ownerUserId,
+        is_deleted: false,
+      },
+      include: {
+        _count: { select: { visits: true } },
+      },
+    }),
 };

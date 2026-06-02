@@ -21,6 +21,17 @@ export const patientTypeDefs = /* GraphQL */ `
     totalPages: Int!
   }
 
+  type PatientWithVisitCount {
+    id: ID!
+    hn: String!
+    firstName: String!
+    lastName: String!
+    age: Int
+    gender: String
+    nationality: String
+    visitCount: Int!
+  }
+
   extend type Query {
     myPatients(
       search: String
@@ -29,11 +40,32 @@ export const patientTypeDefs = /* GraphQL */ `
       page: Int
       pageSize: Int
     ): PatientListResult!
+    patientById(id: ID!): PatientWithVisitCount
   }
 `;
 
 export const patientResolvers = {
   Query: {
+    patientById: async (
+      _parent: unknown,
+      { id }: { id: string },
+      context: GraphQLContext
+    ) => {
+      const { userId } = requireAuth(context);
+      const patient = await patientsRepository.findById(id, userId);
+      if (!patient) return null;
+      return {
+        id: patient.patient_id,
+        hn: patient.hn,
+        firstName: patient.first_name,
+        lastName: patient.last_name,
+        age: patient.age ?? null,
+        gender: patient.gender ?? null,
+        nationality: patient.nationality ?? null,
+        visitCount: patient._count.visits,
+      };
+    },
+
     myPatients: async (
       _parent: unknown,
       args: {
