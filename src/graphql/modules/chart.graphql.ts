@@ -4,7 +4,7 @@ import {
   chartsRepository,
   type SaveChartFullInput,
 } from "../../modules/charts/charts.repository";
-import { findVisitById } from "../../modules/visits/visits.repository";
+import { visitsRepository } from "../../modules/visits/visits.repository";
 import type { GraphQLContext } from "../context";
 import { requireAuth } from "../guards";
 
@@ -52,7 +52,7 @@ export const chartResolvers = {
       context: GraphQLContext
     ) => {
       const { userId } = requireAuth(context);
-      const visit = await findVisitById(visitId);
+      const visit = await visitsRepository.findById(visitId);
       if (!visit || visit.dentist_user_id !== userId) {
         throw new GraphQLError("Visit not found", {
           extensions: { code: "NOT_FOUND" },
