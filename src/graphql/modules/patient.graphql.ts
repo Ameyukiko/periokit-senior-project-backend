@@ -21,7 +21,7 @@ export const patientTypeDefs = /* GraphQL */ `
     totalPages: Int!
   }
 
-  type PatientWithVisitCount {
+  type PatientWithVisits {
     id: ID!
     hn: String!
     firstName: String!
@@ -30,6 +30,7 @@ export const patientTypeDefs = /* GraphQL */ `
     gender: String
     nationality: String
     visitCount: Int!
+    visits: [Visit!]!
   }
 
   extend type Query {
@@ -40,7 +41,7 @@ export const patientTypeDefs = /* GraphQL */ `
       page: Int
       pageSize: Int
     ): PatientListResult!
-    patientById(id: ID!): PatientWithVisitCount
+    patientById(id: ID!): PatientWithVisits
   }
 `;
 
@@ -63,6 +64,16 @@ export const patientResolvers = {
         gender: patient.gender ?? null,
         nationality: patient.nationality ?? null,
         visitCount: patient._count.visits,
+        visits: patient.visits.map((v) => ({
+          id: v.visit_id,
+          patientId: v.patient_id,
+          visitDate: v.visit_date.toISOString().split("T")[0],
+          phase: v.phase,
+          doctorName: v.doctor_name ?? null,
+          studentId: v.student_id ?? null,
+          status: v.status,
+          hasChart: v.periodontal_charts.length > 0,
+        })),
       };
     },
 
