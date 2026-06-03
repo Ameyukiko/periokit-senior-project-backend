@@ -10,6 +10,7 @@ export const patientTypeDefs = /* GraphQL */ `
     lastName: String!
     age: Int
     gender: String
+    nationality: String
     lastVisitDate: String
   }
 
@@ -30,6 +31,7 @@ export const patientTypeDefs = /* GraphQL */ `
     gender: String
     nationality: String
     visitCount: Int!
+    lastVisitDate: String
     visits: [Visit!]!
   }
 
@@ -64,6 +66,9 @@ export const patientResolvers = {
         gender: patient.gender ?? null,
         nationality: patient.nationality ?? null,
         visitCount: patient._count.visits,
+        lastVisitDate: patient.visits[0]?.visit_date
+          ? new Date(patient.visits[0].visit_date).toISOString().split("T")[0]
+          : null,
         visits: patient.visits.map((v) => ({
           id: v.visit_id,
           patientId: v.patient_id,
@@ -100,6 +105,7 @@ export const patientResolvers = {
           lastName: p.last_name,
           age: p.age ?? null,
           gender: p.gender ?? null,
+          nationality: p.nationality ?? null,
           lastVisitDate: p.visits[0]?.visit_date
             ? new Date(p.visits[0].visit_date).toISOString().split("T")[0]
             : null,
