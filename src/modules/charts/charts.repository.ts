@@ -269,12 +269,18 @@ export const chartsRepository = {
           throw new GraphQLError("Visit not found", { extensions: { code: "NOT_FOUND" } });
         visitId = input.visitId;
       } else {
+        const userProfile = await tx.public_users.findUnique({ where: { user_id: userId } });
+        const doctorName = userProfile
+          ? `${userProfile.first_name} ${userProfile.last_name}`.trim()
+          : null;
         const visit = await tx.visits.create({
           data: {
             patient_id: patient.patient_id,
             dentist_user_id: userId,
             visit_date: new Date(input.visitDate),
             phase: input.visitPhase as any,
+            doctor_name: doctorName,
+            student_id: userProfile?.student_id ?? null,
           },
         });
         visitId = visit.visit_id;
