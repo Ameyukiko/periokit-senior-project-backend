@@ -120,9 +120,12 @@ export const mapChartResponse = (
         hn: chart.visit.patient.hn,
         patientName: `${chart.visit.patient.first_name} ${chart.visit.patient.last_name}`.trim(),
         age: chart.visit.patient.age ?? null,
-        gender: chart.visit.patient.gender ?? null,
+        gender: chart.visit.patient.gender
+          ? chart.visit.patient.gender.charAt(0).toUpperCase() + chart.visit.patient.gender.slice(1)
+          : null,
         nationality: chart.visit.patient.nationality ?? null,
         date: chart.visit.visit_date.toISOString().split("T")[0],
+        visitPhase: chart.visit.phase ?? null,
         doctor: chart.visit.doctor_name ?? null,
         studentId: chart.visit.student_id != null ? String(chart.visit.student_id) : null,
       }
