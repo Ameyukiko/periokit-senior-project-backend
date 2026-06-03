@@ -18,6 +18,7 @@ export const chartTypeDefs = /* GraphQL */ `
     date: String!
     doctor: String
     studentId: String
+    visitPhase: String
   }
 
   type PeriodontalChart {

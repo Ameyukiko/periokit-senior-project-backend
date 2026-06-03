@@ -1,4 +1,5 @@
 import { GraphQLError } from "graphql";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 
 type SitePayload = {
@@ -119,9 +120,12 @@ export const mapChartResponse = (
         hn: chart.visit.patient.hn,
         patientName: `${chart.visit.patient.first_name} ${chart.visit.patient.last_name}`.trim(),
         age: chart.visit.patient.age ?? null,
-        gender: chart.visit.patient.gender ?? null,
+        gender: chart.visit.patient.gender
+          ? chart.visit.patient.gender.charAt(0).toUpperCase() + chart.visit.patient.gender.slice(1)
+          : null,
         nationality: chart.visit.patient.nationality ?? null,
         date: chart.visit.visit_date.toISOString().split("T")[0],
+        visitPhase: chart.visit.phase ?? null,
         doctor: chart.visit.doctor_name ?? null,
         studentId: chart.visit.student_id != null ? String(chart.visit.student_id) : null,
       }
@@ -140,58 +144,57 @@ const upsertChartRows = async (
     create: { visit_id: visitId, chart_name: payload.chart_name ?? null, status: "saved" },
   });
 
+  // Delete cascades to surfaces, sites, furcations via FK onDelete: Cascade
   await tx.periodontal_chart_teeth.deleteMany({ where: { chart_id: chart.chart_id } });
 
+  // Bulk create all teeth in one query and get their generated IDs
+  const createdTeeth = await tx.periodontal_chart_teeth.createManyAndReturn({
+    data: payload.teeth.map((tooth) => ({
+      chart_id: chart.chart_id,
+      tooth_number: tooth.tooth_number,
+      arch: tooth.tooth_arch as any,
+      status: tooth.status as any,
+      mobility: tooth.mobility ?? null,
+      prognosis_kc: (tooth.prognosis_kc as any) ?? null,
+      prognosis_mn: (tooth.prognosis_mn as any) ?? null,
+      tooth_note: tooth.tooth_note ?? null,
+    })),
+    select: { chart_tooth_id: true, tooth_number: true },
+  });
+
+  const toothIdMap = new Map(createdTeeth.map((t) => [t.tooth_number, t.chart_tooth_id]));
+
+  const surfacesData: Prisma.periodontal_tooth_surfacesCreateManyInput[] = [];
+  const sitesData: Prisma.periodontal_tooth_sitesCreateManyInput[] = [];
+  const furcationsData: Prisma.periodontal_tooth_furcationsCreateManyInput[] = [];
+
   for (const tooth of payload.teeth) {
-    const chartTooth = await tx.periodontal_chart_teeth.create({
-      data: {
-        chart_id: chart.chart_id,
-        tooth_number: tooth.tooth_number,
-        arch: tooth.tooth_arch as any,
-        status: tooth.status as any,
-        mobility: tooth.mobility ?? null,
-        prognosis_kc: (tooth.prognosis_kc as any) ?? null,
-        prognosis_mn: (tooth.prognosis_mn as any) ?? null,
-        tooth_note: tooth.tooth_note ?? null,
-      },
-    });
-
+    const chart_tooth_id = toothIdMap.get(tooth.tooth_number)!;
     for (const surface of tooth.surfaces) {
-      await tx.periodontal_tooth_surfaces.create({
-        data: {
-          chart_tooth_id: chartTooth.chart_tooth_id,
-          surface: surface.surface as any,
-          ktw_mm: surface.ktw_mm ?? null,
-        },
-      });
-
+      surfacesData.push({ chart_tooth_id, surface: surface.surface as any, ktw_mm: surface.ktw_mm ?? null });
       for (const site of surface.sites) {
-        await tx.periodontal_tooth_sites.create({
-          data: {
-            chart_tooth_id: chartTooth.chart_tooth_id,
-            surface: surface.surface as any,
-            site_position: site.site_position as any,
-            pd_mm: site.pd_mm ?? null,
-            recession_mm: site.recession_mm ?? null,
-            cal_mm: site.cal_mm ?? null,
-            bop: site.bop,
-            plaque: site.plaque,
-          },
+        sitesData.push({
+          chart_tooth_id,
+          surface: surface.surface as any,
+          site_position: site.site_position as any,
+          pd_mm: site.pd_mm ?? null,
+          recession_mm: site.recession_mm ?? null,
+          cal_mm: site.cal_mm ?? null,
+          bop: site.bop,
+          plaque: site.plaque,
         });
       }
     }
-
     for (const fur of tooth.furcations) {
-      await tx.periodontal_tooth_furcations.create({
-        data: {
-          chart_tooth_id: chartTooth.chart_tooth_id,
-          surface: fur.surface as any,
-          site_index: fur.site_index,
-          grade: fur.grade as any,
-        },
-      });
+      furcationsData.push({ chart_tooth_id, surface: fur.surface as any, site_index: fur.site_index, grade: fur.grade as any });
     }
   }
+
+  await Promise.all([
+    surfacesData.length > 0 ? tx.periodontal_tooth_surfaces.createMany({ data: surfacesData }) : Promise.resolve(),
+    sitesData.length > 0 ? tx.periodontal_tooth_sites.createMany({ data: sitesData }) : Promise.resolve(),
+    furcationsData.length > 0 ? tx.periodontal_tooth_furcations.createMany({ data: furcationsData }) : Promise.resolve(),
+  ]);
 
   if (payload.summary) {
     await tx.periodontal_chart_summaries.upsert({
@@ -232,7 +235,7 @@ export const chartsRepository = {
 
   // Legacy: upsert chart only (used if needed standalone)
   upsertChart: (visitId: string, payload: ChartPayload) =>
-    prisma.$transaction((tx) => upsertChartRows(tx, visitId, payload)),
+    prisma.$transaction((tx) => upsertChartRows(tx, visitId, payload), { timeout: 10000 }),
 
   // New: upsert patient -> resolve/create visit -> upsert chart, all in one transaction
   saveChartFull: (userId: string, input: SaveChartFullInput): Promise<string> =>
@@ -266,12 +269,18 @@ export const chartsRepository = {
           throw new GraphQLError("Visit not found", { extensions: { code: "NOT_FOUND" } });
         visitId = input.visitId;
       } else {
+        const userProfile = await tx.public_users.findUnique({ where: { user_id: userId } });
+        const doctorName = userProfile
+          ? `${userProfile.first_name} ${userProfile.last_name}`.trim()
+          : null;
         const visit = await tx.visits.create({
           data: {
             patient_id: patient.patient_id,
             dentist_user_id: userId,
             visit_date: new Date(input.visitDate),
             phase: input.visitPhase as any,
+            doctor_name: doctorName,
+            student_id: userProfile?.student_id ?? null,
           },
         });
         visitId = visit.visit_id;
@@ -282,5 +291,5 @@ export const chartsRepository = {
       await upsertChartRows(tx, visitId, payload);
 
       return visitId;
-    }),
+    }, { timeout: 10000 }),
 };
