@@ -24,6 +24,7 @@ export const chartTypeDefs = /* GraphQL */ `
   type PeriodontalChart {
     id: ID!
     visitId: ID!
+    patientId: ID
     chartName: String
     status: String!
     teethData: JSON!

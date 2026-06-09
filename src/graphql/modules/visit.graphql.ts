@@ -12,6 +12,7 @@ export const visitTypeDefs = /* GraphQL */ `
     studentId: Int
     status: String!
     hasChart: Boolean!
+    createdAt: String!
   }
 
   extend type Query {
@@ -37,6 +38,7 @@ export const visitResolvers = {
         studentId: v.student_id ?? null,
         status: v.status,
         hasChart: v.periodontal_charts.length > 0,
+        createdAt: v.created_at.toISOString(),
       }));
     },
   },

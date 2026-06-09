@@ -104,6 +104,7 @@ export const mapChartResponse = (
 ) => ({
   id: chart.chart_id,
   visitId: chart.visit_id,
+  patientId: chart.visit?.patient_id ?? null,
   chartName: chart.chart_name ?? null,
   status: chart.status,
   teethData: teethPayload,
@@ -267,6 +268,16 @@ export const chartsRepository = {
         const visit = await tx.visits.findUnique({ where: { visit_id: input.visitId } });
         if (!visit || visit.dentist_user_id !== userId)
           throw new GraphQLError("Visit not found", { extensions: { code: "NOT_FOUND" } });
+        
+        // Update visit date and phase to reflect user edits in database
+        await tx.visits.update({
+          where: { visit_id: input.visitId },
+          data: {
+            visit_date: new Date(input.visitDate),
+            phase: input.visitPhase as any,
+          },
+        });
+        
         visitId = input.visitId;
       } else {
         const userProfile = await tx.public_users.findUnique({ where: { user_id: userId } });
