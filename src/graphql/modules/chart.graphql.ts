@@ -45,6 +45,7 @@ export const chartTypeDefs = /* GraphQL */ `
     patientNationality: String
     visitDate: String!
     visitPhase: String!
+    completeVisit: Boolean
   }
 
   extend type Query {
@@ -94,6 +95,7 @@ export const chartResolvers = {
           patientNationality?: string;
           visitDate: string;
           visitPhase: string;
+          completeVisit?: boolean;
         };
       },
       context: GraphQLContext
@@ -112,6 +114,7 @@ export const chartResolvers = {
         patientNationality: input.patientNationality ?? null,
         visitDate: input.visitDate,
         visitPhase: input.visitPhase,
+        completeVisit: input.completeVisit ?? false,
       });
 
       const result = await chartsRepository.findByVisitAndMap(visitId);

@@ -59,6 +59,7 @@ export type SaveChartFullInput = {
   patientNationality?: string | null;
   visitDate: string;
   visitPhase: string;
+  completeVisit?: boolean;
 };
 
 const toNum = (v: unknown): number | null => {
@@ -269,12 +270,13 @@ export const chartsRepository = {
         if (!visit || visit.dentist_user_id !== userId)
           throw new GraphQLError("Visit not found", { extensions: { code: "NOT_FOUND" } });
         
-        // Update visit date and phase to reflect user edits in database
+        // Update visit date, phase, and optionally mark as completed
         await tx.visits.update({
           where: { visit_id: input.visitId },
           data: {
             visit_date: new Date(input.visitDate),
             phase: input.visitPhase as any,
+            ...(input.completeVisit ? { status: "completed" } : {}),
           },
         });
         
@@ -292,6 +294,7 @@ export const chartsRepository = {
             phase: input.visitPhase as any,
             doctor_name: doctorName,
             student_id: userProfile?.student_id ?? null,
+            ...(input.completeVisit ? { status: "completed" } : {}),
           },
         });
         visitId = visit.visit_id;
