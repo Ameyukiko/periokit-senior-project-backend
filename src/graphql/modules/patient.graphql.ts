@@ -40,6 +40,7 @@ export const patientTypeDefs = /* GraphQL */ `
       search: String
       dateFrom: String
       dateTo: String
+      sort: String
       page: Int
       pageSize: Int
     ): PatientListResult!
@@ -88,6 +89,7 @@ export const patientResolvers = {
         search?: string;
         dateFrom?: string;
         dateTo?: string;
+        sort?: "date_asc" | "date_desc" | "name_asc" | "name_desc";
         page?: number;
         pageSize?: number;
       },
