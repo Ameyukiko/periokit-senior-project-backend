@@ -66,10 +66,22 @@ export const uploadXrayAssets = async (req: Request, res: Response) => {
 
   for (const [index, file] of files.entries()) {
     let storagePath: string | null = null;
+    let storageUploaded = false;
     try {
       const uploadId = uploadIds[index];
       if (!uploadId || !isValidXrayUploadId(uploadId)) {
         rejectedFiles.push(rejected(file.originalname, "invalid_upload_id"));
+        continue;
+      }
+
+      const existingAsset = await xraysRepository.findAssetById(uploadId);
+      if (existingAsset) {
+        if (existingAsset.visit_id !== visitId) {
+          rejectedFiles.push(rejected(file.originalname, "duplicate_upload_id"));
+          continue;
+        }
+
+        uploadedRecords.push(existingAsset.asset_id);
         continue;
       }
 
@@ -106,6 +118,7 @@ export const uploadXrayAssets = async (req: Request, res: Response) => {
           upsert: false,
         });
       if (uploadError) throw uploadError;
+      storageUploaded = true;
 
       const asset = await xraysRepository.createAsset({
         asset_id: uploadId,
@@ -121,7 +134,18 @@ export const uploadXrayAssets = async (req: Request, res: Response) => {
       });
       uploadedRecords.push(asset.asset_id);
     } catch (error) {
-      if (storagePath) {
+      // A concurrent retry may have created the asset after the initial lookup.
+      // In that case, return the existing asset instead of deleting its object.
+      const uploadId = uploadIds[index];
+      const concurrentAsset = uploadId
+        ? await xraysRepository.findAssetById(uploadId)
+        : null;
+      if (concurrentAsset?.visit_id === visitId) {
+        uploadedRecords.push(concurrentAsset.asset_id);
+        continue;
+      }
+
+      if (storageUploaded && storagePath) {
         await removeUploadedObject(storagePath);
       }
       rejectedFiles.push(

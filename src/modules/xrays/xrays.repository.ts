@@ -1,6 +1,12 @@
 import { prisma } from "../../lib/prisma";
 
 export const xraysRepository = {
+  async findAssetById(assetId: string) {
+    return prisma.visit_xray_assets.findUnique({
+      where: { asset_id: assetId },
+    });
+  },
+
   async createAsset(data: Parameters<typeof prisma.visit_xray_assets.create>[0]["data"]) {
     return prisma.visit_xray_assets.create({ data });
   },
