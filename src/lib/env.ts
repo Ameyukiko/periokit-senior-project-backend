@@ -8,6 +8,7 @@ const envSchema = z.object({
   SUPABASE_PROFILE_IMAGES_BUCKET: z.string().default("profile-images"),
   SUPABASE_XRAY_BUCKET: z.string().default("xray-images"),
   SUPABASE_XRAY_SIGNED_URL_EXPIRES_IN: z.coerce.number().int().positive().default(14400),
+  SUPABASE_XRAY_MAX_FILE_SIZE_BYTES: z.coerce.number().int().positive().default(10485760),
   SUPABASE_PROFILE_IMAGE_SIGNED_URL_EXPIRES_IN: z.coerce.number().default(604800),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   ALLOWED_ORIGINS: z.string().optional(),

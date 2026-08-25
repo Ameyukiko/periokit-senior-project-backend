@@ -3,6 +3,7 @@ import cors from "cors";
 import { env } from "./lib/env";
 import authRoutes from "./modules/auth/auth.routes";
 import healthRoutes from "./routes/health.routes";
+import xrayRoutes from "./modules/xrays/xrays.routes";
 
 const app = express();
 
@@ -30,5 +31,6 @@ app.use(express.json({ limit: env.JSON_BODY_LIMIT }));
 
 app.use("/", healthRoutes);
 app.use("/auth", authRoutes);
+app.use("/", xrayRoutes);
 
 export default app;

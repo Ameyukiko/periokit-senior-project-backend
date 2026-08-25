@@ -7,7 +7,7 @@ import { requireAuth } from "../guards";
 
 type XrayAssetRecord = Awaited<ReturnType<typeof xraysRepository.findAssetsByVisitId>>[number];
 
-const toXrayAssets = async (assets: XrayAssetRecord[]) => {
+export const toXrayAssets = async (assets: XrayAssetRecord[]) => {
   if (assets.length === 0) return [];
 
   const { data: signedUrls, error } = await supabaseAdmin.storage

@@ -1,6 +1,10 @@
 import { prisma } from "../../lib/prisma";
 
 export const xraysRepository = {
+  async createAsset(data: Parameters<typeof prisma.visit_xray_assets.create>[0]["data"]) {
+    return prisma.visit_xray_assets.create({ data });
+  },
+
   async findBoardByVisitId(visitId: string) {
     return prisma.xray_boards.findUnique({
       where: { visit_id: visitId },
