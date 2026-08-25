@@ -1,9 +1,55 @@
 import { GraphQLError } from "graphql";
 import { env } from "../../lib/env";
 import { supabaseAdmin } from "../../lib/supabase";
-import { xraysRepository } from "../../modules/xrays/xrays.repository";
+import {
+  xraysRepository,
+  XrayBoardError,
+  type SaveXrayBoardObject,
+} from "../../modules/xrays/xrays.repository";
 import type { GraphQLContext } from "../context";
 import { requireAuth } from "../guards";
+import { z } from "zod";
+
+const saveXrayObjectSchema = z
+  .object({
+    objectType: z.enum(["image", "note"]),
+    zIndex: z.number().int(),
+    posX: z.number().int(),
+    posY: z.number().int(),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    rotation: z.number().min(0).lt(360).default(0),
+    assetId: z.string().uuid().nullable().optional(),
+    slotCode: z.string().max(50).nullable().optional(),
+    noteText: z.string().nullable().optional(),
+    noteColor: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/, "noteColor must be #RRGGBB")
+      .nullable()
+      .optional(),
+    noteFontSize: z.number().int().min(10).max(44).nullable().optional(),
+  })
+  .superRefine((object, context) => {
+    if (object.objectType === "image" && !object.assetId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["assetId"],
+        message: "Image objects require assetId",
+      });
+    }
+    if (object.objectType === "note" && object.assetId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["assetId"],
+        message: "Note objects cannot reference an asset",
+      });
+    }
+  });
+
+const saveXrayBoardSchema = z.object({
+  visitId: z.string().uuid(),
+  objects: z.array(saveXrayObjectSchema).max(100),
+});
 
 type XrayAssetRecord = Awaited<ReturnType<typeof xraysRepository.findAssetsByVisitId>>[number];
 
@@ -191,13 +237,44 @@ export const xrayResolvers = {
   Mutation: {
     saveXrayBoard: async (
       _parent: unknown,
-      _args: { input: unknown },
+      { input }: { input: unknown },
       context: GraphQLContext
     ) => {
-      requireAuth(context);
-      throw new GraphQLError("Not implemented", {
-        extensions: { code: "NOT_IMPLEMENTED" },
-      });
+      const { userId } = requireAuth(context);
+      const parsed = saveXrayBoardSchema.safeParse(input);
+      if (!parsed.success) {
+        throw new GraphQLError("Invalid X-ray board input", {
+          extensions: {
+            code: "BAD_USER_INPUT",
+            issues: parsed.error.issues,
+          },
+        });
+      }
+
+      try {
+        await xraysRepository.saveBoard(
+          userId,
+          parsed.data.visitId,
+          parsed.data.objects as SaveXrayBoardObject[]
+        );
+
+        const board = await xraysRepository.findBoardByVisitId(parsed.data.visitId);
+        if (!board) {
+          throw new GraphQLError("X-ray board not found after save", {
+            extensions: { code: "INTERNAL_SERVER_ERROR" },
+          });
+        }
+
+        const assets = await xraysRepository.findAssetsByVisitId(parsed.data.visitId);
+        return toXrayBoard(board, assets);
+      } catch (error) {
+        if (error instanceof XrayBoardError) {
+          throw new GraphQLError(error.message, {
+            extensions: { code: error.code },
+          });
+        }
+        throw error;
+      }
     },
   },
 };

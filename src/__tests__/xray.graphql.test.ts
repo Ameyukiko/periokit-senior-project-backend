@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   findBoardByVisitId: vi.fn(),
   findAssetsByVisitId: vi.fn(),
   findAssetsByIds: vi.fn(),
+  saveBoard: vi.fn(),
   createSignedUrls: vi.fn(),
 }));
 
@@ -14,6 +15,7 @@ vi.mock("../modules/xrays/xrays.repository", () => ({
     findBoardByVisitId: mocks.findBoardByVisitId,
     findAssetsByVisitId: mocks.findAssetsByVisitId,
     findAssetsByIds: mocks.findAssetsByIds,
+    saveBoard: mocks.saveBoard,
   },
 }));
 
@@ -166,5 +168,57 @@ describe("xray resolvers", () => {
       [asset.storage_path],
       14400
     );
+  });
+
+  it("rejects invalid image objects before opening a transaction", async () => {
+    await expect(
+      xrayResolvers.Mutation.saveXrayBoard(
+        {},
+        {
+          input: {
+            visitId: "550e8400-e29b-41d4-a716-446655440000",
+            objects: [
+              {
+                objectType: "image",
+                zIndex: 0,
+                posX: 0,
+                posY: 0,
+                width: 100,
+                height: 100,
+              },
+            ],
+          },
+        },
+        authContext
+      )
+    ).rejects.toMatchObject({ extensions: { code: "BAD_USER_INPUT" } });
+    expect(mocks.saveBoard).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid note color and font size before opening a transaction", async () => {
+    await expect(
+      xrayResolvers.Mutation.saveXrayBoard(
+        {},
+        {
+          input: {
+            visitId: "550e8400-e29b-41d4-a716-446655440000",
+            objects: [
+              {
+                objectType: "note",
+                zIndex: 0,
+                posX: 0,
+                posY: 0,
+                width: 100,
+                height: 100,
+                noteColor: "red",
+                noteFontSize: 72,
+              },
+            ],
+          },
+        },
+        authContext
+      )
+    ).rejects.toMatchObject({ extensions: { code: "BAD_USER_INPUT" } });
+    expect(mocks.saveBoard).not.toHaveBeenCalled();
   });
 });
