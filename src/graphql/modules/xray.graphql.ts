@@ -54,6 +54,7 @@ const saveXrayBoardSchema = z.object({
 type XrayAssetRecord = Awaited<ReturnType<typeof xraysRepository.findAssetsByVisitId>>[number];
 
 export const toXrayAssets = async (assets: XrayAssetRecord[]) => {
+  assets = assets.filter((asset) => asset.status !== "cleanup_failed");
   if (assets.length === 0) return [];
 
   const { data: signedUrls, error } = await supabaseAdmin.storage
@@ -90,6 +91,35 @@ export const toXrayAssets = async (assets: XrayAssetRecord[]) => {
         ]
       : [];
   });
+};
+
+export const cleanupOrphans = async (visitId: string) => {
+  const orphans = await xraysRepository.findOrphanedAssets(visitId);
+
+  for (const orphan of orphans) {
+    try {
+      const { error } = await supabaseAdmin.storage
+        .from(env.SUPABASE_XRAY_BUCKET)
+        .remove([orphan.storage_path]);
+
+      if (error) throw error;
+      await xraysRepository.deleteAsset(orphan.asset_id);
+    } catch (error) {
+      try {
+        await xraysRepository.markCleanupFailed(orphan.asset_id);
+      } catch (markError) {
+        console.error("Failed to mark X-ray cleanup failure", {
+          assetId: orphan.asset_id,
+          message: markError instanceof Error ? markError.message : String(markError),
+        });
+      }
+
+      console.warn("X-ray orphan cleanup failed", {
+        assetId: orphan.asset_id,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 };
 
 const toXrayBoard = async (
@@ -257,6 +287,17 @@ export const xrayResolvers = {
           parsed.data.visitId,
           parsed.data.objects as SaveXrayBoardObject[]
         );
+
+        // Keep Storage cleanup outside the database transaction.
+        // A cleanup failure must not turn a successful save into an error.
+        try {
+          await cleanupOrphans(parsed.data.visitId);
+        } catch (error) {
+          console.warn("X-ray orphan cleanup unexpectedly failed", {
+            visitId: parsed.data.visitId,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
 
         const board = await xraysRepository.findBoardByVisitId(parsed.data.visitId);
         if (!board) {

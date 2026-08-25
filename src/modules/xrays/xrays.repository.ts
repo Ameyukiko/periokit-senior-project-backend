@@ -26,6 +26,24 @@ export class XrayBoardError extends Error {
 }
 
 export const xraysRepository = {
+  async findOrphanedAssets(visitId: string) {
+    return prisma.visit_xray_assets.findMany({
+      where: { visit_id: visitId, status: "orphaned" },
+      select: { asset_id: true, storage_path: true },
+    });
+  },
+
+  async deleteAsset(assetId: string) {
+    return prisma.visit_xray_assets.delete({ where: { asset_id: assetId } });
+  },
+
+  async markCleanupFailed(assetId: string) {
+    return prisma.visit_xray_assets.update({
+      where: { asset_id: assetId },
+      data: { status: "cleanup_failed" },
+    });
+  },
+
   async saveBoard(
     userId: string,
     visitId: string,
