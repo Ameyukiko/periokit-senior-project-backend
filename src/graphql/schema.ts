@@ -2,6 +2,7 @@ import { userResolvers, userTypeDefs } from "./modules/user.graphql";
 import { chartResolvers, chartTypeDefs, JSONResolver } from "./modules/chart.graphql";
 import { patientResolvers, patientTypeDefs } from "./modules/patient.graphql";
 import { visitResolvers, visitTypeDefs } from "./modules/visit.graphql";
+import { xrayResolvers, xrayTypeDefs } from "./modules/xray.graphql";
 
 export const typeDefs = /* GraphQL */ `
   scalar JSON
@@ -20,6 +21,7 @@ export const typeDefs = /* GraphQL */ `
   ${chartTypeDefs}
   ${patientTypeDefs}
   ${visitTypeDefs}
+  ${xrayTypeDefs}
 `;
 
 export const resolvers = {
@@ -33,8 +35,10 @@ export const resolvers = {
     ...chartResolvers.Query,
     ...patientResolvers.Query,
     ...visitResolvers.Query,
+    ...xrayResolvers.Query,
   },
   Mutation: {
     ...chartResolvers.Mutation,
+    ...xrayResolvers.Mutation,
   },
 };
