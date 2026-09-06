@@ -18,6 +18,14 @@ const baseChart: any = {
     plaque_percentage: "30",
   },
   visit: {
+    diagnosis: {
+      diagnosis_id: "diagnosis-1",
+      visit_id: "visit-1",
+      extent: "localized",
+      complexity: { boneLossPercent: 35 },
+      created_at: new Date("2026-06-21T09:00:00.000Z"),
+      updated_at: new Date("2026-06-21T10:00:00.000Z"),
+    },
     patient_id: "patient-1",
     phase: "initial",
     doctor_name: "Dr. Pikul",
@@ -65,6 +73,18 @@ describe("mapChartResponse", () => {
       total_teeth: 28,
       bop_percentage: 12.5,
       plaque_percentage: 30,
+    });
+  });
+
+  it("returns the persisted diagnosis inputs with the chart", () => {
+    const result = mapChartResponse(baseChart, teethPayload as any);
+    expect(result.diagnosis).toEqual({
+      id: "diagnosis-1",
+      visitId: "visit-1",
+      extent: "localized",
+      complexity: { boneLossPercent: 35 },
+      createdAt: "2026-06-21T09:00:00.000Z",
+      updatedAt: "2026-06-21T10:00:00.000Z",
     });
   });
 

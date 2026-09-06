@@ -1,6 +1,10 @@
 import { GraphQLError } from "graphql";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
+import {
+  upsertDiagnosis,
+  type SaveDiagnosisData,
+} from "../diagnoses/diagnoses.repository";
 
 type SitePayload = {
   site_position: string;
@@ -60,6 +64,7 @@ export type SaveChartFullInput = {
   visitDate: string;
   visitPhase: string;
   completeVisit?: boolean;
+  diagnosis: SaveDiagnosisData;
 };
 
 const toNum = (v: unknown): number | null => {
@@ -117,6 +122,16 @@ export const mapChartResponse = (
       }
     : null,
   updatedAt: chart.updated_at.toISOString(),
+  diagnosis: chart.visit?.diagnosis
+    ? {
+        id: chart.visit.diagnosis.diagnosis_id,
+        visitId: chart.visit.diagnosis.visit_id,
+        extent: chart.visit.diagnosis.extent,
+        complexity: chart.visit.diagnosis.complexity,
+        createdAt: chart.visit.diagnosis.created_at.toISOString(),
+        updatedAt: chart.visit.diagnosis.updated_at.toISOString(),
+      }
+    : null,
   patientInfo: chart.visit?.patient
     ? {
         hn: chart.visit.patient.hn,
@@ -225,7 +240,7 @@ export const chartsRepository = {
       include: {
         teeth: { include: { surfaces: true, sites: true, furcations: true } },
         summary: true,
-        visit: { include: { patient: true } },
+        visit: { include: { patient: true, diagnosis: true } },
       },
     }),
 
@@ -303,6 +318,10 @@ export const chartsRepository = {
       // 3. Upsert chart
       const payload = { ...input.teethData, chart_name: input.chartName ?? null };
       await upsertChartRows(tx, visitId, payload);
+
+      // Chart and diagnosis inputs are one document from the user's point of
+      // view, so they must commit or roll back together.
+      await upsertDiagnosis(tx, visitId, input.diagnosis);
 
       return visitId;
     }, { timeout: 10000 }),

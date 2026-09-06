@@ -555,14 +555,28 @@ model visits {
   created_at      DateTime     @default(now()) @db.Timestamptz(6)
   updated_at      DateTime     @updatedAt @db.Timestamptz(6)
 
-  patient            patients             @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
-  dentist            public_users         @relation("DentistVisits", fields: [dentist_user_id], references: [user_id])
+  patient            patients               @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
+  dentist            public_users           @relation("DentistVisits", fields: [dentist_user_id], references: [user_id])
   periodontal_charts periodontal_charts[]
+  diagnosis          periodontal_diagnoses?
   xray_board         xray_boards?
   xray_assets        visit_xray_assets[]
 
   @@index([patient_id, visit_date(sort: Desc)])
   @@index([dentist_user_id])
+  @@schema("public")
+}
+
+model periodontal_diagnoses {
+  diagnosis_id String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  visit_id     String            @unique @db.Uuid
+  extent       diagnosis_extent?
+  complexity   Json              @db.JsonB
+  created_at   DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime          @updatedAt @db.Timestamptz(6)
+
+  visit visits @relation(fields: [visit_id], references: [visit_id], onDelete: Cascade)
+
   @@schema("public")
 }
 
@@ -905,6 +919,14 @@ enum surface_group {
   buccal
   palatal
   lingual
+
+  @@schema("public")
+}
+
+enum diagnosis_extent {
+  localized
+  generalized
+  molar_incisor
 
   @@schema("public")
 }

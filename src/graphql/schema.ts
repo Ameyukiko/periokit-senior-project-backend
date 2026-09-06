@@ -1,5 +1,10 @@
 import { userResolvers, userTypeDefs } from "./modules/user.graphql";
-import { chartResolvers, chartTypeDefs, JSONResolver } from "./modules/chart.graphql";
+import {
+  chartResolvers,
+  chartTypeDefs,
+  diagnosisEnumResolvers,
+  JSONResolver,
+} from "./modules/chart.graphql";
 import { patientResolvers, patientTypeDefs } from "./modules/patient.graphql";
 import { visitResolvers, visitTypeDefs } from "./modules/visit.graphql";
 import { xrayResolvers, xrayTypeDefs } from "./modules/xray.graphql";
@@ -26,6 +31,7 @@ export const typeDefs = /* GraphQL */ `
 
 export const resolvers = {
   JSON: JSONResolver,
+  ...diagnosisEnumResolvers,
   Query: {
     health: () => ({
       ok: true,
