@@ -55,6 +55,9 @@ export const chartTypeDefs = /* GraphQL */ `
     smoking: SmokingExposure
     diabetes: DiabetesControl
     ageYears: Int
+    calStageOverride: DiagnosisStage
+    boneLossStageOverride: DiagnosisStage
+    toothLossStageOverride: DiagnosisStage
     complexityStageOverride: DiagnosisStage
   }
 
@@ -75,6 +78,9 @@ export const chartTypeDefs = /* GraphQL */ `
     smoking: SmokingExposure
     diabetes: DiabetesControl
     ageYears: Int
+    calStageOverride: DiagnosisStage
+    boneLossStageOverride: DiagnosisStage
+    toothLossStageOverride: DiagnosisStage
     complexityStageOverride: DiagnosisStage
   }
 
@@ -181,6 +187,18 @@ export const diagnosisSchema = z
         smoking: z.enum(["non_smoker", "lt_10", "gte_10"]).nullable().optional(),
         diabetes: z.enum(["none", "hba1c_lt_7", "hba1c_gte_7"]).nullable().optional(),
         ageYears: z.number().int().min(0).max(150).nullable().optional(),
+        calStageOverride: z
+          .enum(["stage_1", "stage_2", "stage_3", "stage_4"])
+          .nullable()
+          .optional(),
+        boneLossStageOverride: z
+          .enum(["stage_1", "stage_2", "stage_3", "stage_4"])
+          .nullable()
+          .optional(),
+        toothLossStageOverride: z
+          .enum(["stage_1", "stage_2", "stage_3", "stage_4"])
+          .nullable()
+          .optional(),
         complexityStageOverride: z
           .enum(["stage_1", "stage_2", "stage_3", "stage_4"])
           .nullable()
@@ -266,6 +284,9 @@ export const chartResolvers = {
             smoking: diagnosis.complexity.smoking ?? null,
             diabetes: diagnosis.complexity.diabetes ?? null,
             ageYears: diagnosis.complexity.ageYears ?? null,
+            calStageOverride: diagnosis.complexity.calStageOverride ?? null,
+            boneLossStageOverride: diagnosis.complexity.boneLossStageOverride ?? null,
+            toothLossStageOverride: diagnosis.complexity.toothLossStageOverride ?? null,
             complexityStageOverride:
               diagnosis.complexity.complexityStageOverride ?? null,
           },

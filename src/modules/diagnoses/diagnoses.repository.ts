@@ -8,6 +8,9 @@ export type DiagnosisComplexityData = {
   smoking: "non_smoker" | "lt_10" | "gte_10" | null;
   diabetes: "none" | "hba1c_lt_7" | "hba1c_gte_7" | null;
   ageYears: number | null;
+  calStageOverride: "stage_1" | "stage_2" | "stage_3" | "stage_4" | null;
+  boneLossStageOverride: "stage_1" | "stage_2" | "stage_3" | "stage_4" | null;
+  toothLossStageOverride: "stage_1" | "stage_2" | "stage_3" | "stage_4" | null;
   complexityStageOverride: "stage_1" | "stage_2" | "stage_3" | "stage_4" | null;
 };
 
