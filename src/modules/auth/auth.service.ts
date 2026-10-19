@@ -7,6 +7,7 @@ import {
   requireUserProfileByUserId,
 } from "../users/users.repository";
 import { LoginInput, RegisterInput } from "./auth.validation";
+import { AppError } from "../../utils/errors";
 
 export type ProfileImageUpload = {
   buffer: Buffer;
@@ -236,9 +237,22 @@ export const loginUser = async (input: LoginInput) => {
     throw error;
   }
 
+  if (!data.user) {
+    throw new AppError("Authentication provider did not return a user", 502);
+  }
+
+  const profile = await requireUserProfileByUserId(data.user.id);
+  if (profile.is_deleted || !profile.is_active) {
+    if (data.session?.access_token) {
+      await supabaseAdmin.auth.admin.signOut(data.session.access_token, "global");
+    }
+    throw new AppError("User account is disabled", 403);
+  }
+
   return {
     user: data.user,
     session: data.session,
+    profile: await withSignedProfileImageUrl(supabaseAdmin, profile),
   };
 };
 

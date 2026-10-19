@@ -1,4 +1,4 @@
-import { getUserByAccessToken } from "../modules/auth/auth.service";
+import { authenticateAccessToken } from "../modules/auth/auth.identity";
 
 export type GraphQLContext = {
   accessToken?: string;
@@ -18,17 +18,14 @@ export const getContextFromAuthHeader = async (
   const accessToken = match?.[1]?.trim();
   if (!accessToken) return {};
 
-  const user = await getUserByAccessToken(accessToken);
+  const { user, profile } = await authenticateAccessToken(accessToken);
 
   return {
     accessToken,
     user: {
       id: user.id,
       email: user.email,
-      role:
-        typeof user.user_metadata?.role === "string"
-          ? user.user_metadata.role
-          : null,
+      role: profile.role,
     },
   };
 };

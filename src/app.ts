@@ -5,6 +5,7 @@ import authRoutes from "./modules/auth/auth.routes";
 import healthRoutes from "./routes/health.routes";
 import xrayRoutes from "./modules/xrays/xrays.routes";
 import exportRoutes from "./modules/exports/exports.routes";
+import adminUsersRoutes from "./modules/admin-users/admin-users.routes";
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use(express.json({ limit: env.JSON_BODY_LIMIT }));
 
 app.use("/", healthRoutes);
 app.use("/auth", authRoutes);
+app.use("/admin", adminUsersRoutes);
 app.use("/", xrayRoutes);
 app.use("/", exportRoutes);
 

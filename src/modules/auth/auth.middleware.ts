@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
-import { getUserByAccessToken } from "./auth.service";
+import { AppError } from "../../utils/errors";
+import { authenticateAccessToken } from "./auth.identity";
 
 export const authenticate = async (
   req: Request,
@@ -20,20 +21,19 @@ export const authenticate = async (
   }
 
   try {
-    const user = await getUserByAccessToken(accessToken);
-
-    req.auth = {
-      accessToken,
-      user,
-    };
+    req.auth = await authenticateAccessToken(accessToken);
 
     next();
   } catch (error) {
     console.error("Authentication failed", error);
 
-    res.status(401).json({
+    const statusCode = error instanceof AppError ? error.statusCode : 401;
+    res.status(statusCode).json({
       success: false,
-      message: "Invalid authentication token",
+      message:
+        statusCode === 403
+          ? "User account is disabled"
+          : "Invalid authentication token",
     });
   }
 };
