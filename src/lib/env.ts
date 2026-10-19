@@ -24,6 +24,28 @@ const envSchema = z.object({
     .int()
     .positive()
     .default(150 * 1024 * 1024),
+  EXPORT_RENDERER_URL: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().url().optional()
+  ),
+  EXPORT_RENDERER_READY_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .max(60000)
+    .default(15000),
+  EXPORT_RENDER_CACHE_TTL_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .max(300000)
+    .default(30000),
+  EXPORT_RENDER_CACHE_MAX_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1024 * 1024)
+    .max(512 * 1024 * 1024)
+    .default(64 * 1024 * 1024),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -78,6 +78,9 @@ export const createExportRequestSchema = requestSchema.and(
     expectedSnapshotVersion: z
       .string()
       .regex(/^[A-Za-z0-9_-]{43}$/, "Invalid snapshot version"),
+    expectedRendererVersion: z
+      .union([z.literal("legacy"), z.string().regex(/^\d+\.\d+$/, "Invalid renderer version")])
+      .optional(),
   })
 );
 

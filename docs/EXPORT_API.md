@@ -40,6 +40,7 @@ Successful response:
 ```json
 {
   "snapshotVersion": "base64url-sha256-version",
+  "rendererVersion": "1.0",
   "availability": {
     "chart": { "available": true, "reason": null },
     "images": { "available": true, "reason": null },
@@ -64,6 +65,8 @@ Successful response:
 
 The HTML contains no scripts or external resources and is intended for a
 sandboxed iframe. The frontend must treat it as opaque preview content.
+`rendererVersion` is `legacy` until `EXPORT_RENDERER_URL` is configured, then
+it is the shared renderer protocol version.
 
 The current database does not classify stored images as X-ray versus intraoral.
 For that reason every active visit image is exposed through the single `images`
@@ -84,9 +87,14 @@ Use the same body as preview and add the exact version returned by preview:
   "grayscale": false,
   "pngDpi": 150,
   "baseFilename": "periodontal-report",
-  "expectedSnapshotVersion": "base64url-sha256-version"
+  "expectedSnapshotVersion": "base64url-sha256-version",
+  "expectedRendererVersion": "1.0"
 }
 ```
+
+When the shared renderer is enabled, `expectedRendererVersion` is required and
+must exactly match the value returned by preview. During legacy fallback it is
+optional.
 
 The response is a streamed binary with `Content-Type`, `Content-Length`, and a
 safe RFC 5987 `Content-Disposition`. PDF and XLSX are returned directly. PNG is
@@ -109,13 +117,30 @@ returned directly for one page and as ZIP for multiple pages.
 | 401 | `AUTHENTICATION_REQUIRED` | Bearer token is missing/invalid (normally returned by auth middleware) |
 | 404 | `VISIT_NOT_FOUND` | Visit is missing or not owned by the authenticated user |
 | 409 | `EXPORT_SOURCE_CHANGED` | Saved data changed after preview; refresh preview |
+| 409 | `EXPORT_RENDERER_CHANGED` | Renderer changed after preview; refresh preview |
 | 422 | `EXPORT_DATA_UNAVAILABLE` | A selected section has no saved data |
 | 422 | `EXPORT_ASSET_UNAVAILABLE` | A selected image is missing or unreadable |
 | 422 | `EXPORT_LIMIT_EXCEEDED` | Page, asset, or source-byte limit exceeded |
+| 422 | `EXPORT_RENDER_FAILED` | Shared renderer reported a safe render error |
+| 422 | `EXPORT_RENDERER_EXTERNAL_ASSET` | Renderer output depends on a remote CSS asset |
+| 422 | `EXPORT_RENDERER_OUTPUT_INVALID` | Renderer omitted one or more requested pages |
+| 422 | `EXPORT_RENDERER_VERSION_MISMATCH` | Frontend renderer protocol is incompatible |
 | 429 | `EXPORT_QUEUE_FULL` | Two jobs are active and ten jobs are already queued |
 | 499 | `EXPORT_CANCELLED` | Client disconnected before completion |
 | 504 | `EXPORT_TIMEOUT` | Generation exceeded 60 seconds |
+| 504 | `EXPORT_RENDER_TIMEOUT` | Shared renderer did not become ready in time |
 
 `X-Export-Queue-Status` is `queued` or `preparing`. A disconnect cancels queued
 work and closes an active Chromium context. Export files are held in memory and
 are not written to the database, local disk, or Supabase Storage.
+
+The shared Chromium process is reused across jobs, while every job receives an
+isolated browser context that is closed on completion or cancellation. Preview
+pages are captured at 1x; downloaded files use a separate 2x render. Completed
+renders are kept in a user/visit/snapshot-scoped in-memory LRU cache for 30
+seconds by default. The cache is bounded to 64 MB and never bypasses the fresh
+snapshot/ownership check. Configure these limits with
+`EXPORT_RENDER_CACHE_TTL_MS` and `EXPORT_RENDER_CACHE_MAX_BYTES`.
+
+The shared print-renderer integration is documented in
+[`EXPORT_RENDERER_PROTOCOL.md`](./EXPORT_RENDERER_PROTOCOL.md).

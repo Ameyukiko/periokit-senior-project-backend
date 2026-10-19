@@ -53,6 +53,20 @@ describe("export request contract", () => {
     ).toBe(false);
   });
 
+  it("validates the optional renderer compatibility version", () => {
+    const base = {
+      format: "pdf" as const,
+      sections: ["chart"],
+      expectedSnapshotVersion: "a".repeat(43),
+    };
+    expect(
+      createExportRequestSchema.safeParse({ ...base, expectedRendererVersion: "1.0" }).success
+    ).toBe(true);
+    expect(
+      createExportRequestSchema.safeParse({ ...base, expectedRendererVersion: "latest" }).success
+    ).toBe(false);
+  });
+
   it("creates safe ASCII and RFC 5987 download names", () => {
     const header = contentDisposition("รายงานผู้ป่วย.pdf");
     expect(header).toContain('filename="_____________.pdf"');
