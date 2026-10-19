@@ -508,14 +508,52 @@ model public_users {
   profile_image_url    String?
   is_active            Boolean
   is_deleted           Boolean             @default(false)
+  deleted_at           DateTime?           @db.Timestamptz(6)
+  deleted_by           String?             @db.Uuid
+  updated_by           String?             @db.Uuid
   created_at           DateTime            @default(now()) @db.Timestamptz(6)
   updated_at           DateTime            @default(now()) @db.Timestamptz(6)
   users                auth_users          @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  deleted_by_user      public_users?       @relation("UserDeletedBy", fields: [deleted_by], references: [user_id], onDelete: SetNull, onUpdate: Cascade)
+  updated_by_user      public_users?       @relation("UserUpdatedBy", fields: [updated_by], references: [user_id], onDelete: SetNull, onUpdate: Cascade)
+  deleted_users        public_users[]      @relation("UserDeletedBy")
+  updated_users        public_users[]      @relation("UserUpdatedBy")
+  admin_audit_actions  admin_user_audit_logs[] @relation("AdminAuditActor")
+  admin_audit_targets  admin_user_audit_logs[] @relation("AdminAuditTarget")
   owned_patients       patients[]          @relation("PatientOwner")
   dentist_visits       visits[]            @relation("DentistVisits")
   uploaded_xray_assets visit_xray_assets[] @relation("XrayAssetUploader")
 
+  @@index([is_deleted, is_active], map: "users_deleted_active_idx")
+  @@index([role, is_deleted, is_active], map: "users_role_deleted_active_idx")
+  @@index([student_id], map: "users_student_id_idx")
+  @@index([created_at(sort: Desc)], map: "users_created_at_desc_idx")
+  @@index([deleted_at], map: "users_deleted_at_idx")
   @@map("users")
+  @@schema("public")
+}
+
+/// Append-only history of privileged user-management actions.
+/// Mutation prevention and expression indexes for user search are managed in SQL migrations.
+model admin_user_audit_logs {
+  audit_id           String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actor_user_id      String                  @db.Uuid
+  actor_role         user_role
+  target_user_id     String                  @db.Uuid
+  target_role_before user_role?
+  target_role_after  user_role?
+  action             admin_user_audit_action
+  before_data        Json                    @default("{}") @db.JsonB
+  after_data         Json                    @default("{}") @db.JsonB
+  request_id         String?                 @db.VarChar(100)
+  created_at         DateTime                @default(now()) @db.Timestamptz(6)
+  actor              public_users            @relation("AdminAuditActor", fields: [actor_user_id], references: [user_id], onDelete: Restrict, onUpdate: Cascade)
+  target             public_users            @relation("AdminAuditTarget", fields: [target_user_id], references: [user_id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([actor_user_id, created_at(sort: Desc)], map: "admin_user_audit_actor_created_idx")
+  @@index([target_user_id, created_at(sort: Desc)], map: "admin_user_audit_target_created_idx")
+  @@index([action, created_at(sort: Desc)], map: "admin_user_audit_action_created_idx")
+  @@index([request_id], map: "admin_user_audit_request_id_idx")
   @@schema("public")
 }
 
@@ -781,6 +819,18 @@ enum one_time_token_type {
 enum user_role {
   admin
   dentist
+  super_admin
+
+  @@schema("public")
+}
+
+enum admin_user_audit_action {
+  profile_updated
+  role_changed
+  deactivated
+  reactivated
+  deleted
+  restored
 
   @@schema("public")
 }
