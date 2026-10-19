@@ -4,6 +4,7 @@ import { env } from "./lib/env";
 import authRoutes from "./modules/auth/auth.routes";
 import healthRoutes from "./routes/health.routes";
 import xrayRoutes from "./modules/xrays/xrays.routes";
+import exportRoutes from "./modules/exports/exports.routes";
 
 const app = express();
 
@@ -32,5 +33,6 @@ app.use(express.json({ limit: env.JSON_BODY_LIMIT }));
 app.use("/", healthRoutes);
 app.use("/auth", authRoutes);
 app.use("/", xrayRoutes);
+app.use("/", exportRoutes);
 
 export default app;

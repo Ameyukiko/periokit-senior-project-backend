@@ -14,6 +14,16 @@ const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   ALLOWED_ORIGINS: z.string().optional(),
   JSON_BODY_LIMIT: z.string().default("1mb"),
+  EXPORT_MAX_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
+  EXPORT_MAX_QUEUE: z.coerce.number().int().min(0).max(100).default(10),
+  EXPORT_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300000).default(60000),
+  EXPORT_MAX_PAGES: z.coerce.number().int().min(1).max(20).default(6),
+  EXPORT_MAX_ASSETS: z.coerce.number().int().min(1).max(100).default(30),
+  EXPORT_MAX_SOURCE_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(150 * 1024 * 1024),
 });
 
 export type Env = z.infer<typeof envSchema>;
