@@ -16,6 +16,7 @@ import {
   ExportRenderCache,
   type RenderQuality,
 } from "./exports.render-cache";
+import { ExportTimings } from "./exports.metrics";
 import { renderReport } from "./exports.renderer";
 import { generateExportWithSharedView, renderWithSharedView } from "./exports.shared-renderer";
 import {
@@ -35,12 +36,17 @@ const currentRendererVersion = () =>
 export const getVisitExportSource = async (
   visitId: string,
   userId: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  timings = new ExportTimings()
 ) => {
-  const snapshot = await loadExportSnapshot(visitId, userId, signal);
+  const snapshot = await timings.measure("snapshot", () =>
+    loadExportSnapshot(visitId, userId, signal)
+  );
   const availability = getSectionAvailability(snapshot);
   const assets = availability.images.available
-    ? await loadXrayAssetsForRender(snapshot, false, signal)
+    ? await timings.measure("assets", () =>
+        loadXrayAssetsForRender(snapshot, false, signal)
+      )
     : new Map<string, string>();
   throwIfAborted(signal);
   return buildExportSourceModel(
@@ -83,7 +89,8 @@ const renderVisitReportCached = async (
   snapshot: Awaited<ReturnType<typeof loadExportSnapshot>>,
   request: PreviewExportRequest,
   signal: AbortSignal,
-  quality: RenderQuality
+  quality: RenderQuality,
+  timings: ExportTimings
 ) => {
   const rendererVersion = currentRendererVersion();
   // The legacy renderer emits identical HTML for preview and export. Sharing
@@ -101,9 +108,13 @@ const renderVisitReportCached = async (
   if (cached) return { report: cached, rendererVersion };
 
   const assets = request.sections.includes("images")
-    ? await loadXrayAssetsForRender(snapshot, request.grayscale, signal)
+    ? await timings.measure("assets", () =>
+        loadXrayAssetsForRender(snapshot, request.grayscale, signal)
+      )
     : new Map<string, string>();
-  const rendered = await renderVisitReport(snapshot, request, assets, signal, quality);
+  const rendered = await timings.measure("render", () =>
+    renderVisitReport(snapshot, request, assets, signal, quality)
+  );
   throwIfAborted(signal);
   exportRenderCache.set(cacheKey, rendered.report);
   return rendered;
@@ -113,9 +124,12 @@ export const previewVisitExport = async (
   visitId: string,
   userId: string,
   request: PreviewExportRequest,
-  signal: AbortSignal
+  signal: AbortSignal,
+  timings = new ExportTimings()
 ) => {
-  const snapshot = await loadExportSnapshot(visitId, userId, signal);
+  const snapshot = await timings.measure("snapshot", () =>
+    loadExportSnapshot(visitId, userId, signal)
+  );
   assertSectionsAvailable(snapshot, request.sections);
   const { report, rendererVersion } = await renderVisitReportCached(
     visitId,
@@ -123,7 +137,8 @@ export const previewVisitExport = async (
     snapshot,
     request,
     signal,
-    "preview"
+    "preview",
+    timings
   );
   throwIfAborted(signal);
   return {
@@ -140,9 +155,12 @@ export const createVisitExport = async (
   visitId: string,
   userId: string,
   request: CreateExportRequest,
-  signal: AbortSignal
+  signal: AbortSignal,
+  timings = new ExportTimings()
 ) => {
-  const snapshot = await loadExportSnapshot(visitId, userId, signal);
+  const snapshot = await timings.measure("snapshot", () =>
+    loadExportSnapshot(visitId, userId, signal)
+  );
   if (snapshot.snapshotVersion !== request.expectedSnapshotVersion) {
     throw new ExportError(
       409,
@@ -164,17 +182,22 @@ export const createVisitExport = async (
   }
   assertSectionsAvailable(snapshot, request.sections);
 
-  if (request.format !== "excel" && env.EXPORT_RENDERER_URL) {
+  const rendererUrl = env.EXPORT_RENDERER_URL;
+  if (request.format !== "excel" && rendererUrl) {
     const assets = request.sections.includes("images")
-      ? await loadXrayAssetsForRender(snapshot, request.grayscale, signal)
+      ? await timings.measure("assets", () =>
+          loadXrayAssetsForRender(snapshot, request.grayscale, signal)
+        )
       : new Map<string, string>();
     const model = buildExportRenderModel(snapshot, request, assets);
-    return generateExportWithSharedView(
-      model,
-      request,
-      env.EXPORT_RENDERER_URL,
-      env.EXPORT_RENDERER_READY_TIMEOUT_MS,
-      signal
+    return timings.measure("generate", () =>
+      generateExportWithSharedView(
+        model,
+        request,
+        rendererUrl,
+        env.EXPORT_RENDERER_READY_TIMEOUT_MS,
+        signal
+      )
     );
   }
 
@@ -186,7 +209,10 @@ export const createVisitExport = async (
         snapshot,
         request,
         signal,
-        "export"
+        "export",
+        timings
       )).report;
-  return generateExport(snapshot, request, report.pages, signal);
+  return timings.measure("generate", () =>
+    generateExport(snapshot, request, report.pages, signal)
+  );
 };

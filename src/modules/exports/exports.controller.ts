@@ -7,7 +7,8 @@ import {
 } from "./exports.contract";
 import { ExportError } from "./exports.errors";
 import { contentDisposition } from "./exports.generator";
-import { exportQueue } from "./exports.queue";
+import { ExportTimings } from "./exports.metrics";
+import { finalExportQueue, sourceExportQueue } from "./exports.queue";
 import { createVisitExport, getVisitExportSource, previewVisitExport } from "./exports.service";
 
 const requestAbortSignal = (req: Request, res: Response) => {
@@ -62,50 +63,71 @@ const requireUserId = (req: Request) => {
 };
 
 export const previewExport = async (req: Request, res: Response) => {
+  const timings = new ExportTimings();
   try {
     const visitId = parseVisitId(req);
     const userId = requireUserId(req);
     const input = previewExportRequestSchema.parse(req.body);
     const signal = requestAbortSignal(req, res);
-    const queued = exportQueue.stats.willQueue;
+    const queued = sourceExportQueue.stats.willQueue;
     res.setHeader("X-Export-Queue-Status", queued ? "queued" : "preparing");
-    const preview = await exportQueue.run(
-      (jobSignal) => previewVisitExport(visitId, userId, input, jobSignal),
+    const queuedAt = performance.now();
+    const preview = await sourceExportQueue.run(
+      (jobSignal) => {
+        timings.add("queue", performance.now() - queuedAt);
+        return previewVisitExport(visitId, userId, input, jobSignal, timings);
+      },
       signal
     );
-    if (!signal.aborted) res.status(200).json(preview);
+    if (!signal.aborted) {
+      res.setHeader("Server-Timing", timings.toServerTiming());
+      res.status(200).json(preview);
+    }
   } catch (error) {
     sendError(res, error);
   }
 };
 
 export const exportSource = async (req: Request, res: Response) => {
+  const timings = new ExportTimings();
   try {
     const visitId = parseVisitId(req);
     const userId = requireUserId(req);
     const signal = requestAbortSignal(req, res);
-    const queued = exportQueue.stats.willQueue;
+    const queued = sourceExportQueue.stats.willQueue;
     res.setHeader("X-Export-Queue-Status", queued ? "queued" : "preparing");
-    const source = await exportQueue.run(
-      (jobSignal) => getVisitExportSource(visitId, userId, jobSignal),
+    const queuedAt = performance.now();
+    const source = await sourceExportQueue.run(
+      (jobSignal) => {
+        timings.add("queue", performance.now() - queuedAt);
+        return getVisitExportSource(visitId, userId, jobSignal, timings);
+      },
       signal
     );
-    if (!signal.aborted) res.status(200).json(source);
+    if (!signal.aborted) {
+      res.setHeader("Server-Timing", timings.toServerTiming());
+      res.status(200).json(source);
+    }
   } catch (error) {
     sendError(res, error);
   }
 };
 
 export const createExport = async (req: Request, res: Response) => {
+  const timings = new ExportTimings();
   try {
     const visitId = parseVisitId(req);
     const userId = requireUserId(req);
     const input = createExportRequestSchema.parse(req.body);
     const signal = requestAbortSignal(req, res);
-    const queued = exportQueue.stats.willQueue;
+    const queued = finalExportQueue.stats.willQueue;
     res.setHeader("X-Export-Queue-Status", queued ? "queued" : "preparing");
-    const generated = await exportQueue.run(
-      (jobSignal) => createVisitExport(visitId, userId, input, jobSignal),
+    const queuedAt = performance.now();
+    const generated = await finalExportQueue.run(
+      (jobSignal) => {
+        timings.add("queue", performance.now() - queuedAt);
+        return createVisitExport(visitId, userId, input, jobSignal, timings);
+      },
       signal
     );
     if (signal.aborted) return;
@@ -113,6 +135,7 @@ export const createExport = async (req: Request, res: Response) => {
     res.setHeader("Content-Type", generated.contentType);
     res.setHeader("Content-Length", String(generated.body.length));
     res.setHeader("Content-Disposition", contentDisposition(generated.filename));
+    res.setHeader("Server-Timing", timings.toServerTiming());
     res.status(200).end(generated.body);
   } catch (error) {
     sendError(res, error);

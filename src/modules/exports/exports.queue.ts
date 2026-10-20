@@ -103,8 +103,14 @@ export class ExportQueue {
   }
 }
 
-export const exportQueue = new ExportQueue(
+export const finalExportQueue = new ExportQueue(
   env.EXPORT_MAX_CONCURRENCY,
   env.EXPORT_MAX_QUEUE,
   env.EXPORT_TIMEOUT_MS
+);
+
+export const sourceExportQueue = new ExportQueue(
+  env.EXPORT_SOURCE_MAX_CONCURRENCY,
+  env.EXPORT_SOURCE_MAX_QUEUE,
+  env.EXPORT_SOURCE_TIMEOUT_MS
 );
