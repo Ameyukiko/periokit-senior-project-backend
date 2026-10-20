@@ -112,7 +112,7 @@ export type PreviewExportRequest = z.infer<typeof previewExportRequestSchema>;
 export type CreateExportRequest = z.infer<typeof createExportRequestSchema>;
 
 export const defaultOrientation = (page: ExportPageName): PageOrientation =>
-  page === "chart" || page === "images" ? "landscape" : "portrait";
+  page === "images" ? "landscape" : "portrait";
 
 export const pageDimensions = (
   paperSize: PaperSize,

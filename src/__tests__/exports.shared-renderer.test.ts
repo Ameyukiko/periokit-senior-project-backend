@@ -50,7 +50,7 @@ const renderModel = () => {
     format: "pdf",
     sections: ["chart", "diagnosis"],
     paperSize: "a4",
-    orientations: {},
+    orientations: { chart: "landscape" },
     grayscale: false,
     baseFilename: "report",
   };

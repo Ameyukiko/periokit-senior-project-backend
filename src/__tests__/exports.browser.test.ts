@@ -31,7 +31,7 @@ describe("Chromium export smoke tests", () => {
     const pdf = await PDFDocument.load(generated.body);
 
     expect(pdf.getPageCount()).toBe(2);
-    expect(pdf.getPage(0).getWidth()).toBeGreaterThan(pdf.getPage(0).getHeight());
+    expect(pdf.getPage(0).getWidth()).toBeLessThan(pdf.getPage(0).getHeight());
     expect(pdf.getPage(1).getWidth()).toBeLessThan(pdf.getPage(1).getHeight());
     expect(generated.contentType).toBe("application/pdf");
   }, 30000);

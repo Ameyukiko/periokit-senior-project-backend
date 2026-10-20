@@ -37,7 +37,7 @@ describe("export renderer", () => {
       "diagnosis",
       "notes",
     ]);
-    expect(report.pages[0]).toMatchObject({ widthMm: 297, heightMm: 210 });
+    expect(report.pages[0]).toMatchObject({ widthMm: 210, heightMm: 297 });
     expect(report.pages[1]).toMatchObject({ widthMm: 210, heightMm: 297 });
     expect(report.pages[2].html).toContain("Page 3 of 3");
     for (const page of report.pages) {
