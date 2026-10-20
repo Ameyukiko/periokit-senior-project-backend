@@ -9,3 +9,19 @@ export const requireAdminDashboardAccess = (req: Request, res: Response, next: N
   }
   next();
 };
+
+export const requireSuperAdmin = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (req.auth?.profile.role !== user_role.super_admin) {
+    res.status(403).json({
+      success: false,
+      reason: "SUPER_ADMIN_REQUIRED",
+      message: "Super admin access is required",
+    });
+    return;
+  }
+  next();
+};

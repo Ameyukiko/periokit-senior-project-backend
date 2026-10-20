@@ -18,4 +18,10 @@ describe("admin users API contract", () => {
     expect(routes).not.toMatch(/router\.post\("\/users"/);
     expect(routes).not.toContain("invite");
   });
+
+  it("protects the audit-log query with the super-admin middleware", () => {
+    expect(routes).toContain(
+      'router.get("/audit-logs", requireSuperAdmin, listAuditLogs)'
+    );
+  });
 });

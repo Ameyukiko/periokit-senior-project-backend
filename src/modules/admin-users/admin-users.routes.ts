@@ -1,10 +1,15 @@
 import { Router } from "express";
 import { authenticate } from "../auth/auth.middleware";
+import { listAuditLogs } from "../admin-audit-logs/admin-audit-logs.controller";
 import { lifecycle, listUsers, patchUser, showUser } from "./admin-users.controller";
-import { requireAdminDashboardAccess } from "./admin-users.middleware";
+import {
+  requireAdminDashboardAccess,
+  requireSuperAdmin,
+} from "./admin-users.middleware";
 
 const router = Router();
 router.use(authenticate, requireAdminDashboardAccess);
+router.get("/audit-logs", requireSuperAdmin, listAuditLogs);
 router.get("/users", listUsers);
 router.get("/users/:userId", showUser);
 router.patch("/users/:userId", patchUser);
