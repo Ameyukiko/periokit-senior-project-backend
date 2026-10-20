@@ -37,6 +37,19 @@ describe("export request contract", () => {
     ).toBe(false);
   });
 
+  it.each([
+    "a3", "a4", "a5", "b4", "b5", "jis-b4", "jis-b5",
+    "letter", "legal", "tabloid", "executive",
+  ])("accepts the frontend paper size %s", (paperSize) => {
+    expect(
+      previewExportRequestSchema.safeParse({
+        format: "pdf",
+        sections: ["chart"],
+        paperSize,
+      }).success
+    ).toBe(true);
+  });
+
   it("rejects duplicate sections and invalid snapshot versions", () => {
     expect(
       previewExportRequestSchema.safeParse({
@@ -50,6 +63,20 @@ describe("export request contract", () => {
         sections: ["chart"],
         expectedSnapshotVersion: "stale",
       }).success
+    ).toBe(false);
+  });
+
+  it("validates the optional renderer compatibility version", () => {
+    const base = {
+      format: "pdf" as const,
+      sections: ["chart"],
+      expectedSnapshotVersion: "a".repeat(43),
+    };
+    expect(
+      createExportRequestSchema.safeParse({ ...base, expectedRendererVersion: "1.0" }).success
+    ).toBe(true);
+    expect(
+      createExportRequestSchema.safeParse({ ...base, expectedRendererVersion: "latest" }).success
     ).toBe(false);
   });
 

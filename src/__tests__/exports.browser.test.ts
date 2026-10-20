@@ -31,7 +31,7 @@ describe("Chromium export smoke tests", () => {
     const pdf = await PDFDocument.load(generated.body);
 
     expect(pdf.getPageCount()).toBe(2);
-    expect(pdf.getPage(0).getWidth()).toBeGreaterThan(pdf.getPage(0).getHeight());
+    expect(pdf.getPage(0).getWidth()).toBeLessThan(pdf.getPage(0).getHeight());
     expect(pdf.getPage(1).getWidth()).toBeLessThan(pdf.getPage(1).getHeight());
     expect(generated.contentType).toBe("application/pdf");
   }, 30000);
@@ -67,7 +67,8 @@ describe("Chromium export smoke tests", () => {
     const snapshot = exportSnapshotFixture();
     const request: CreateExportRequest = {
       format: "png",
-      sections: ["notes", "imageNotes"],
+      includeImageNotes: true,
+      sections: ["chart", "notes", "imageNotes"],
       paperSize: "a4",
       orientations: {},
       grayscale: true,
@@ -86,8 +87,8 @@ describe("Chromium export smoke tests", () => {
 
     expect(generated.filename).toBe("report.zip");
     expect(Object.keys(zip.files)).toEqual([
-      "report-01-notes.png",
-      "report-02-imageNotes.png",
+      "report-01-chart.png",
+      "report-02-notes.png",
     ]);
   }, 30000);
 });

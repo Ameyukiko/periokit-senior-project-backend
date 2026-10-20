@@ -57,4 +57,28 @@ describe("export queue", () => {
       expect.objectContaining<Partial<ExportError>>({ code: "EXPORT_TIMEOUT", statusCode: 504 })
     );
   });
+
+  it("keeps interactive source work independent from saturated final exports", async () => {
+    const finalQueue = new ExportQueue(1, 1, 1000);
+    const sourceQueue = new ExportQueue(1, 1, 1000);
+    let releaseFinal!: () => void;
+    const finalGate = new Promise<void>((resolve) => { releaseFinal = resolve; });
+    const final = finalQueue.run(
+      async () => { await finalGate; return "final"; },
+      new AbortController().signal
+    );
+    const queuedFinal = finalQueue.run(
+      async () => "queued-final",
+      new AbortController().signal
+    );
+
+    await expect(
+      sourceQueue.run(async () => "source", new AbortController().signal)
+    ).resolves.toBe("source");
+    expect(finalQueue.stats).toMatchObject({ active: 1, queued: 1 });
+
+    releaseFinal();
+    await expect(final).resolves.toBe("final");
+    await expect(queuedFinal).resolves.toBe("queued-final");
+  });
 });

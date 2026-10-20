@@ -132,8 +132,14 @@ const renderDiagnosis = (snapshot: ExportSnapshot) => {
     </tbody></table>`;
 };
 
-const renderXray = (snapshot: ExportSnapshot, assets: ExportAssetMap) => {
-  const objects = snapshot.xray!.objects;
+const renderXray = (
+  snapshot: ExportSnapshot,
+  assets: ExportAssetMap,
+  includeImageNotes: boolean,
+) => {
+  const objects = snapshot.xray!.objects.filter(
+    (object) => includeImageNotes || object.objectType === "image"
+  );
   const maxX = Math.max(1000, ...objects.map((object) => object.posX + object.width));
   const maxY = Math.max(650, ...objects.map((object) => object.posY + object.height));
   return `<div class="xray-board" style="aspect-ratio:${maxX}/${maxY}">
@@ -155,15 +161,6 @@ const renderXray = (snapshot: ExportSnapshot, assets: ExportAssetMap) => {
   </div>`;
 };
 
-const renderXrayNotes = (snapshot: ExportSnapshot) => {
-  const notes = snapshot.xray!.objects.filter(
-    (object) => object.objectType === "note" && object.noteText?.trim()
-  );
-  return `<table><thead><tr><th>#</th><th>Note</th></tr></thead><tbody>
-    ${notes.map((note, index) => `<tr><td>${index + 1}</td><td class="pre">${escapeHtml(note.noteText)}</td></tr>`).join("")}
-  </tbody></table>`;
-};
-
 const renderNotes = (snapshot: ExportSnapshot) => {
   const toothNotes = snapshot.chart?.teeth.filter((tooth) => tooth.note?.trim()) ?? [];
   return `<section class="note-block"><h2>Patient note</h2><div class="pre">${display(snapshot.patient.note)}</div></section>
@@ -174,14 +171,15 @@ const renderNotes = (snapshot: ExportSnapshot) => {
 const renderBody = (
   section: ExportPageName,
   snapshot: ExportSnapshot,
-  assets: ExportAssetMap
+  assets: ExportAssetMap,
+  includeImageNotes: boolean
 ) => {
   switch (section) {
     case "patientDetails": return renderPatientDetails(snapshot);
     case "chart": return renderChart(snapshot);
     case "diagnosis": return renderDiagnosis(snapshot);
-    case "images": return renderXray(snapshot, assets);
-    case "imageNotes": return renderXrayNotes(snapshot);
+    case "images": return renderXray(snapshot, assets, includeImageNotes);
+    case "imageNotes": return "";
     case "notes": return renderNotes(snapshot);
   }
 };
@@ -224,10 +222,11 @@ const standaloneHtml = (
   widthMm: number,
   heightMm: number,
   generatedAt: string,
-  grayscale: boolean
+  grayscale: boolean,
+  includePatientDetails: boolean
 ) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${reportStyles(widthMm, heightMm)}</style></head>
   <body><article class="page${grayscale ? " grayscale" : ""}">
-    <header><div class="brand">PerioKit</div><div class="patient"><strong>${escapeHtml(snapshot.patient.firstName)} ${escapeHtml(snapshot.patient.lastName)}</strong><br>HN ${escapeHtml(snapshot.patient.hn)} · Visit ${escapeHtml(snapshot.visit.date)}<br>${escapeHtml(snapshot.visit.doctorName ?? "Clinician not recorded")}</div></header>
+    <header><div class="brand">PerioKit</div>${includePatientDetails ? `<div class="patient"><strong>${escapeHtml(snapshot.patient.firstName)} ${escapeHtml(snapshot.patient.lastName)}</strong><br>HN ${escapeHtml(snapshot.patient.hn)} · Visit ${escapeHtml(snapshot.visit.date)}<br>${escapeHtml(snapshot.visit.doctorName ?? "Clinician not recorded")}</div>` : ""}</header>
     <h1>${escapeHtml(SECTION_TITLES[section])}</h1><main>${body}</main>
     <footer><span>Generated ${escapeHtml(generatedAt)}</span><span>Page ${pageNumber} of ${pageCount}</span></footer>
   </article></body></html>`;
@@ -245,10 +244,11 @@ export const renderReport = (
   assets: ExportAssetMap,
   generatedAt = new Date().toISOString()
 ): RenderedReport => {
-  // Patient and visit details are mandatory in the header of every selected
-  // section. They are not a separate page, so a one-section PNG export can be
-  // returned as a PNG rather than an unnecessary ZIP.
-  const sections: ExportPageName[] = [...request.sections];
+  const includeImageNotes = request.includeImageNotes
+    ?? request.sections.includes("imageNotes");
+  const sections: ExportPageName[] = request.sections.filter(
+    (section) => section !== "imageNotes"
+  );
   if (sections.length > env.EXPORT_MAX_PAGES) {
     throw new ExportError(422, "EXPORT_LIMIT_EXCEEDED", "Too many report pages", {
       limit: env.EXPORT_MAX_PAGES,
@@ -258,7 +258,7 @@ export const renderReport = (
   const pages = sections.map((section, index) => {
     const orientation = request.orientations[section] ?? defaultOrientation(section);
     const dimensions = pageDimensions(request.paperSize as PaperSize, orientation);
-    const body = renderBody(section, snapshot, assets);
+    const body = renderBody(section, snapshot, assets, includeImageNotes);
     return {
       id: `${index + 1}-${section}`,
       section,
@@ -276,7 +276,8 @@ export const renderReport = (
         dimensions.width,
         dimensions.height,
         generatedAt,
-        request.grayscale
+        request.grayscale,
+        request.includePatientDetails !== false
       ),
     };
   });

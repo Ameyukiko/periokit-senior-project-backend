@@ -13,13 +13,35 @@ export const EXPORT_PAGE_NAMES = ["patientDetails", ...EXPORT_SECTION_NAMES] as 
 export type ExportSectionName = (typeof EXPORT_SECTION_NAMES)[number];
 export type ExportPageName = (typeof EXPORT_PAGE_NAMES)[number];
 export type ExportFormat = "pdf" | "png" | "excel";
-export type PaperSize = "a4" | "letter" | "legal";
+export const PAPER_SIZES = [
+  "a3",
+  "a4",
+  "a5",
+  "b4",
+  "b5",
+  "jis-b4",
+  "jis-b5",
+  "letter",
+  "legal",
+  "tabloid",
+  "executive",
+] as const;
+
+export type PaperSize = (typeof PAPER_SIZES)[number];
 export type PageOrientation = "portrait" | "landscape";
 
 export const PAPER_DIMENSIONS_MM: Record<PaperSize, { width: number; height: number }> = {
+  a3: { width: 297, height: 420 },
   a4: { width: 210, height: 297 },
+  a5: { width: 148, height: 210 },
+  b4: { width: 250, height: 353 },
+  b5: { width: 176, height: 250 },
+  "jis-b4": { width: 257, height: 364 },
+  "jis-b5": { width: 182, height: 257 },
   letter: { width: 215.9, height: 279.4 },
   legal: { width: 215.9, height: 355.6 },
+  tabloid: { width: 279.4, height: 431.8 },
+  executive: { width: 184.15, height: 266.7 },
 };
 
 const sectionSchema = z.enum(EXPORT_SECTION_NAMES);
@@ -39,6 +61,8 @@ const sanitizeBaseFilename = (value: string) => {
 const requestSchema = z
   .object({
     format: z.enum(["pdf", "png", "excel"]),
+    includePatientDetails: z.boolean().optional(),
+    includeImageNotes: z.boolean().optional(),
     sections: z
       .array(sectionSchema)
       .min(1, "Select at least one export section")
@@ -46,7 +70,7 @@ const requestSchema = z
       .refine((sections) => new Set(sections).size === sections.length, {
         message: "Export sections must be unique",
       }),
-    paperSize: z.enum(["a4", "letter", "legal"]).default("a4"),
+    paperSize: z.enum(PAPER_SIZES).default("a4"),
     orientations: z
       .partialRecord(z.enum(EXPORT_PAGE_NAMES), orientationSchema)
       .default({}),
@@ -78,6 +102,9 @@ export const createExportRequestSchema = requestSchema.and(
     expectedSnapshotVersion: z
       .string()
       .regex(/^[A-Za-z0-9_-]{43}$/, "Invalid snapshot version"),
+    expectedRendererVersion: z
+      .union([z.literal("legacy"), z.string().regex(/^\d+\.\d+$/, "Invalid renderer version")])
+      .optional(),
   })
 );
 
@@ -87,7 +114,7 @@ export type PreviewExportRequest = z.infer<typeof previewExportRequestSchema>;
 export type CreateExportRequest = z.infer<typeof createExportRequestSchema>;
 
 export const defaultOrientation = (page: ExportPageName): PageOrientation =>
-  page === "chart" || page === "images" ? "landscape" : "portrait";
+  page === "images" ? "landscape" : "portrait";
 
 export const pageDimensions = (
   paperSize: PaperSize,

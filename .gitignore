@@ -34,3 +34,4 @@ dist/*
 *.txt
 docs/*
 !docs/EXPORT_API.md
+!docs/EXPORT_RENDERER_PROTOCOL.md
