@@ -33,6 +33,9 @@ const exportRenderCache = new ExportRenderCache(
 const currentRendererVersion = () =>
   env.EXPORT_RENDERER_URL ? EXPORT_RENDERER_PROTOCOL_VERSION : "legacy";
 
+const chartOnlyForExcel = <T extends PreviewExportRequest | CreateExportRequest>(request: T): T =>
+  request.format === "excel" ? { ...request, sections: ["chart"] } : request;
+
 export const getVisitExportSource = async (
   visitId: string,
   userId: string,
@@ -127,6 +130,7 @@ export const previewVisitExport = async (
   signal: AbortSignal,
   timings = new ExportTimings()
 ) => {
+  request = chartOnlyForExcel(request);
   const snapshot = await timings.measure("snapshot", () =>
     loadExportSnapshot(visitId, userId, signal)
   );
@@ -158,6 +162,7 @@ export const createVisitExport = async (
   signal: AbortSignal,
   timings = new ExportTimings()
 ) => {
+  request = chartOnlyForExcel(request);
   const snapshot = await timings.measure("snapshot", () =>
     loadExportSnapshot(visitId, userId, signal)
   );

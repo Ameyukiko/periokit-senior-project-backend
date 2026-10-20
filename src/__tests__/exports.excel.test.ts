@@ -4,9 +4,28 @@ import { generateExport } from "../modules/exports/exports.generator";
 import { exportSnapshotFixture } from "./exports.fixture";
 
 describe("Excel export", () => {
-  it("creates the required sheets and preserves clinical value types", async () => {
+  it("creates only the chart sheet and preserves clinical value types", async () => {
+    const snapshot = exportSnapshotFixture();
+    snapshot.chart!.teeth.push(
+      {
+        number: 18, arch: "upper", status: "missing", mobility: null,
+        prognosisKc: null, prognosisMn: null, note: null,
+        surfaces: [], sites: [], furcations: [],
+      },
+      {
+        number: 28, arch: "upper", status: "implant", mobility: null,
+        prognosisKc: null, prognosisMn: null, note: null,
+        surfaces: [], sites: [], furcations: [],
+      },
+      {
+        number: 16, arch: "upper", status: "present", mobility: null,
+        prognosisKc: null, prognosisMn: null, note: null,
+        surfaces: [], sites: [],
+        furcations: [{ surface: "buccal", siteIndex: 1, grade: "grade_2" }],
+      },
+    );
     const generated = await generateExport(
-      exportSnapshotFixture(),
+      snapshot,
       {
         format: "excel",
         sections: ["chart", "diagnosis"],
@@ -22,14 +41,21 @@ describe("Excel export", () => {
 
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(generated.body as any);
-    expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual([
-      "Chart",
-      "Sites",
-      "Diagnosis",
-    ]);
-    expect(workbook.getWorksheet("Chart")!.getCell("A2").value).toBe("00123");
-    expect(workbook.getWorksheet("Sites")!.getCell("F2").value).toBe(4);
-    expect(workbook.getWorksheet("Sites")!.getCell("I2").value).toBe(true);
+    expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual(["Chart"]);
+    const chart = workbook.getWorksheet("Chart")!;
+    expect(chart.getCell("Y9").value).toBe(11);
+    expect(chart.getCell("Y3").value).toBe(3.5);
+    expect(chart.getCell("Y4").value).toBe(1);
+    expect(chart.getCell("Y5").value).toBe(5);
+    expect(chart.getCell("Y6").value).toBe(4);
+    expect(chart.getCell("Y7").value).toBe(1);
+    expect(chart.getCell("BB25").value).toBe("00123");
+    expect(chart.getCell("BB25").numFmt).toBe("@");
+    expect(chart.getCell("BB26").value).toBe("Ada Lovelace");
+    expect(chart.getCell("D10").value).toBe("x");
+    expect(chart.getCell("AW10").value).toBe("I");
+    expect(chart.getCell("K2").value).toBe(2);
+    expect(chart.pageSetup.orientation).toBe("landscape");
     expect(generated).toMatchObject({
       filename: "patient-report.xlsx",
       contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
