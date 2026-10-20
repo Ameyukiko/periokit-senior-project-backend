@@ -8,6 +8,7 @@ import {
 } from "./exports.contract";
 import type { ExportAssetMap } from "./exports.assets";
 import type { ExportSnapshot } from "./exports.snapshot";
+import type { SectionAvailability } from "./exports.snapshot";
 
 export const EXPORT_RENDERER_PROTOCOL_VERSION = "1.0" as const;
 
@@ -61,6 +62,11 @@ export type ExportRenderModel = {
       naturalHeight: number;
     }>;
   };
+};
+
+export type ExportSourceModel = Omit<ExportRenderModel, "options" | "pages"> & {
+  rendererVersion: string;
+  availability: SectionAvailability;
 };
 
 export const buildExportRenderModel = (
@@ -132,4 +138,28 @@ export const buildExportRenderModel = (
         }
       : null,
   };
+};
+
+export const buildExportSourceModel = (
+  snapshot: ExportSnapshot,
+  assets: ExportAssetMap,
+  rendererVersion: string,
+  availability: SectionAvailability,
+  generatedAt = new Date().toISOString()
+): ExportSourceModel => {
+  const model = buildExportRenderModel(
+    snapshot,
+    {
+      format: "pdf",
+      sections: [],
+      paperSize: "a4",
+      orientations: {},
+      grayscale: false,
+      baseFilename: "periodontal-report",
+    },
+    assets,
+    generatedAt
+  );
+  const { options: _options, pages: _pages, ...source } = model;
+  return { ...source, rendererVersion, availability };
 };

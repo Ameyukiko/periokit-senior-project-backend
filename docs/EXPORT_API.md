@@ -1,8 +1,18 @@
 # Export API contract
 
-Both endpoints require `Authorization: Bearer <access-token>`. A visit that does
+All endpoints require `Authorization: Bearer <access-token>`. A visit that does
 not exist or is not owned by the authenticated dentist returns `404` so that
 resource ownership is not disclosed.
+
+## Preview source
+
+`GET /visits/:visitId/exports/source`
+
+Returns the authorized saved snapshot, section availability, renderer version,
+and self-contained preview image assets. The frontend loads this response once
+per visit and applies paper, orientation, section, and grayscale changes
+locally. Storage paths, filenames, credentials, and authorization tokens are
+not included.
 
 ## Preview
 

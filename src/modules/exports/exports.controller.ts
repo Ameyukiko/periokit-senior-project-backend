@@ -8,7 +8,7 @@ import {
 import { ExportError } from "./exports.errors";
 import { contentDisposition } from "./exports.generator";
 import { exportQueue } from "./exports.queue";
-import { createVisitExport, previewVisitExport } from "./exports.service";
+import { createVisitExport, getVisitExportSource, previewVisitExport } from "./exports.service";
 
 const requestAbortSignal = (req: Request, res: Response) => {
   const controller = new AbortController();
@@ -74,6 +74,23 @@ export const previewExport = async (req: Request, res: Response) => {
       signal
     );
     if (!signal.aborted) res.status(200).json(preview);
+  } catch (error) {
+    sendError(res, error);
+  }
+};
+
+export const exportSource = async (req: Request, res: Response) => {
+  try {
+    const visitId = parseVisitId(req);
+    const userId = requireUserId(req);
+    const signal = requestAbortSignal(req, res);
+    const queued = exportQueue.stats.willQueue;
+    res.setHeader("X-Export-Queue-Status", queued ? "queued" : "preparing");
+    const source = await exportQueue.run(
+      (jobSignal) => getVisitExportSource(visitId, userId, jobSignal),
+      signal
+    );
+    if (!signal.aborted) res.status(200).json(source);
   } catch (error) {
     sendError(res, error);
   }

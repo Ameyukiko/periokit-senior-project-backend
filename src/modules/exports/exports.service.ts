@@ -8,6 +8,7 @@ import { ExportError, throwIfAborted } from "./exports.errors";
 import { generateExport } from "./exports.generator";
 import {
   buildExportRenderModel,
+  buildExportSourceModel,
   EXPORT_RENDERER_PROTOCOL_VERSION,
 } from "./exports.render-model";
 import {
@@ -30,6 +31,25 @@ const exportRenderCache = new ExportRenderCache(
 
 const currentRendererVersion = () =>
   env.EXPORT_RENDERER_URL ? EXPORT_RENDERER_PROTOCOL_VERSION : "legacy";
+
+export const getVisitExportSource = async (
+  visitId: string,
+  userId: string,
+  signal: AbortSignal
+) => {
+  const snapshot = await loadExportSnapshot(visitId, userId, signal);
+  const availability = getSectionAvailability(snapshot);
+  const assets = availability.images.available
+    ? await loadXrayAssetsForRender(snapshot, false, signal)
+    : new Map<string, string>();
+  throwIfAborted(signal);
+  return buildExportSourceModel(
+    snapshot,
+    assets,
+    currentRendererVersion(),
+    availability
+  );
+};
 
 const renderVisitReport = async (
   snapshot: Awaited<ReturnType<typeof loadExportSnapshot>>,
