@@ -159,6 +159,32 @@ describe("shared frontend export renderer", () => {
     expect(pdf.getPage(1).getWidth()).toBeLessThan(pdf.getPage(1).getHeight());
   }, 15000);
 
+  it("keeps one model page as one PDF page when rendered DOM overflows", async () => {
+    const url = await startRenderer(
+      'window.__PERIOKIT_EXPORT_STATUS__ = { state: "ready", protocolVersion: input.protocolVersion };',
+      '[data-export-page-id]::after { content: "overflow"; display: block; margin-top: 1200px; }'
+    );
+    const baseModel = renderModel();
+    const firstPage = { ...baseModel.pages[0]!, pageCount: 1 };
+    const model = { ...baseModel, pages: [firstPage] };
+    const request: CreateExportRequest = {
+      format: "pdf",
+      sections: ["chart"],
+      paperSize: "a4",
+      orientations: {},
+      grayscale: false,
+      baseFilename: "report",
+      expectedSnapshotVersion: model.snapshotVersion,
+      expectedRendererVersion: "1.0",
+    };
+    const generated = await generateExportWithSharedView(
+      model, request, url, 5000, new AbortController().signal
+    );
+    const pdf = await PDFDocument.load(generated.body);
+
+    expect(pdf.getPageCount()).toBe(1);
+  }, 15000);
+
   it("captures direct PNG pages at the requested DPI and packages a zip", async () => {
     const url = await startRenderer(
       'window.__PERIOKIT_EXPORT_STATUS__ = { state: "ready", protocolVersion: input.protocolVersion };'

@@ -302,6 +302,9 @@ const generatePdfDirect = async (
         printBackground: true,
         margin: { top: "0", right: "0", bottom: "0", left: "0" },
         preferCSSPageSize: true,
+        // One render-model page is one output page. Chromium can otherwise
+        // paginate a sub-pixel/form-control overflow into a stray extra page.
+        pageRanges: "1",
       });
       pdfPages.push(Buffer.from(bytes));
     } finally {
