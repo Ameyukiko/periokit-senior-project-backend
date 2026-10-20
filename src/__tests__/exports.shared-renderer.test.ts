@@ -1,12 +1,16 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import JSZip from "jszip";
+import { PDFDocument } from "pdf-lib";
+import sharp from "sharp";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { buildExportRenderModel } from "../modules/exports/exports.render-model";
 import {
   closeSharedRendererBrowser,
+  generateExportWithSharedView,
   renderWithSharedView,
 } from "../modules/exports/exports.shared-renderer";
-import type { PreviewExportRequest } from "../modules/exports/exports.contract";
+import type { CreateExportRequest, PreviewExportRequest } from "../modules/exports/exports.contract";
 import { exportSnapshotFixture } from "./exports.fixture";
 
 const servers: Server[] = [];
@@ -30,7 +34,7 @@ const startRenderer = async (statusScript: string, extraCss = "") => {
     </style></head><body><script>
       const input = window.__PERIOKIT_EXPORT_INPUT__;
       document.body.insertAdjacentHTML("afterbegin", input.pages.map((page) =>
-        '<main data-export-page-id="' + page.id + '"><h1>' + page.title + '</h1><span>' + input.patient.hn + '</span></main>'
+        '<main data-export-page-id="' + page.id + '" style="width:' + page.widthMm + 'mm;height:' + page.heightMm + 'mm"><h1>' + page.title + '</h1><span>' + input.patient.hn + '</span></main>'
       ).join(""));
       ${statusScript}
     </script></body></html>`);
@@ -127,6 +131,64 @@ describe("shared frontend export renderer", () => {
     await expect(
       renderWithSharedView(renderModel(), url, 200, new AbortController().signal)
     ).rejects.toMatchObject({ code: "EXPORT_RENDER_TIMEOUT", statusCode: 504 });
+  }, 15000);
+
+  it("generates a mixed-orientation PDF directly from the shared view", async () => {
+    const url = await startRenderer(
+      'window.__PERIOKIT_EXPORT_STATUS__ = { state: "ready", protocolVersion: input.protocolVersion };'
+    );
+    const model = renderModel();
+    const request: CreateExportRequest = {
+      format: "pdf",
+      sections: ["chart", "diagnosis"],
+      paperSize: "a4",
+      orientations: {},
+      grayscale: false,
+      baseFilename: "report",
+      expectedSnapshotVersion: model.snapshotVersion,
+      expectedRendererVersion: "1.0",
+    };
+    const generated = await generateExportWithSharedView(
+      model, request, url, 5000, new AbortController().signal
+    );
+    const pdf = await PDFDocument.load(generated.body);
+
+    expect(generated).toMatchObject({ filename: "report.pdf", contentType: "application/pdf" });
+    expect(pdf.getPageCount()).toBe(2);
+    expect(pdf.getPage(0).getWidth()).toBeGreaterThan(pdf.getPage(0).getHeight());
+    expect(pdf.getPage(1).getWidth()).toBeLessThan(pdf.getPage(1).getHeight());
+  }, 15000);
+
+  it("captures direct PNG pages at the requested DPI and packages a zip", async () => {
+    const url = await startRenderer(
+      'window.__PERIOKIT_EXPORT_STATUS__ = { state: "ready", protocolVersion: input.protocolVersion };'
+    );
+    const model = renderModel();
+    const request: CreateExportRequest = {
+      format: "png",
+      sections: ["chart", "diagnosis"],
+      paperSize: "a4",
+      orientations: {},
+      grayscale: false,
+      pngDpi: 96,
+      baseFilename: "report",
+      expectedSnapshotVersion: model.snapshotVersion,
+      expectedRendererVersion: "1.0",
+    };
+    const generated = await generateExportWithSharedView(
+      model, request, url, 5000, new AbortController().signal
+    );
+    const zip = await JSZip.loadAsync(generated.body);
+    const first = await zip.file("report-01-chart.png")!.async("nodebuffer");
+    const metadata = await sharp(first).metadata();
+
+    expect(generated).toMatchObject({ filename: "report.zip", contentType: "application/zip" });
+    expect(Object.keys(zip.files)).toEqual([
+      "report-01-chart.png",
+      "report-02-diagnosis.png",
+    ]);
+    expect(metadata.width).toBe(Math.round((297 / 25.4) * 96));
+    expect(metadata.height).toBe(Math.round((210 / 25.4) * 96));
   }, 15000);
 
   it("closes rendering when the caller cancels", async () => {

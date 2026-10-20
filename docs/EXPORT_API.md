@@ -146,10 +146,12 @@ work and closes an active Chromium context. Export files are held in memory and
 are not written to the database, local disk, or Supabase Storage.
 
 The shared Chromium process is reused across jobs, while every job receives an
-isolated browser context that is closed on completion or cancellation. Preview
-pages are captured at 1x; downloaded files use a separate 2x render. Completed
-renders are kept in a user/visit/snapshot-scoped in-memory LRU cache for 30
-seconds by default. The cache is bounded to 64 MB and never bypasses the fresh
+isolated browser context that is closed on completion or cancellation. Shared
+renderer PDF files are printed directly from the frontend DOM, and PNG files
+are captured directly at the requested DPI. The intermediate screenshot HTML
+and second Chromium pass are skipped. Legacy and fallback preview renders are
+kept in a user/visit/snapshot-scoped in-memory LRU cache for 30 seconds by
+default. The cache is bounded to 64 MB and never bypasses the fresh
 snapshot/ownership check. Configure these limits with
 `EXPORT_RENDER_CACHE_TTL_MS` and `EXPORT_RENDER_CACHE_MAX_BYTES`.
 

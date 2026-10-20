@@ -1,5 +1,11 @@
-import { chromium, errors as playwrightErrors, type Browser, type BrowserContext } from "playwright";
+import { Buffer } from "node:buffer";
+import JSZip from "jszip";
+import { PDFDocument } from "pdf-lib";
+import { chromium, errors as playwrightErrors, type Browser, type BrowserContext, type Page } from "playwright";
+import sharp from "sharp";
+import type { CreateExportRequest } from "./exports.contract";
 import { ExportError, throwIfAborted } from "./exports.errors";
+import type { GeneratedExport } from "./exports.generator";
 import {
   EXPORT_RENDERER_PROTOCOL_VERSION,
   type ExportRenderModel,
@@ -125,13 +131,14 @@ const extractSelfContainedPages = async (
   return rendered;
 };
 
-export const renderWithSharedView = async (
+const withSharedView = async <T>(
   model: ExportRenderModel,
   rendererUrlValue: string,
   timeoutMs: number,
   signal: AbortSignal,
-  quality: RenderQuality = "export"
-): Promise<RenderedReport> => {
+  deviceScaleFactor: number,
+  work: (page: Page) => Promise<T>
+): Promise<T> => {
   throwIfAborted(signal);
   const rendererUrl = parseRendererUrl(rendererUrlValue);
   let context: BrowserContext | null = null;
@@ -143,7 +150,7 @@ export const renderWithSharedView = async (
     context = await browser.newContext({
       javaScriptEnabled: true,
       viewport: { width: 1600, height: 1200 },
-      deviceScaleFactor: quality === "preview" ? 1 : 2,
+      deviceScaleFactor,
     });
     const page = await context.newPage();
     page.setDefaultTimeout(timeoutMs);
@@ -227,10 +234,9 @@ export const renderWithSharedView = async (
     });
     throwIfAborted(signal);
 
-    return {
-      pages: await extractSelfContainedPages(page, model),
-      warnings: [],
-    };
+    const result = await work(page);
+    throwIfAborted(signal);
+    return result;
   } catch (error) {
     if (signal.aborted) throwIfAborted(signal);
     if (error instanceof ExportError) throw error;
@@ -242,4 +248,150 @@ export const renderWithSharedView = async (
     removeAbortListener();
     if (context) await context.close().catch(() => undefined);
   }
+};
+
+export const renderWithSharedView = async (
+  model: ExportRenderModel,
+  rendererUrlValue: string,
+  timeoutMs: number,
+  signal: AbortSignal,
+  quality: RenderQuality = "export"
+): Promise<RenderedReport> => ({
+  pages: await withSharedView(
+    model,
+    rendererUrlValue,
+    timeoutMs,
+    signal,
+    quality === "preview" ? 1 : 2,
+    (page) => extractSelfContainedPages(page, model)
+  ),
+  warnings: [],
+});
+
+const pageOnlyCss = (pageModel: ExportRenderModel["pages"][number]) => `
+  @page { size: ${pageModel.widthMm}mm ${pageModel.heightMm}mm; margin: 0; }
+  html, body, #app, #export-render-root { width: ${pageModel.widthMm}mm !important; height: ${pageModel.heightMm}mm !important; min-height: 0 !important; margin: 0 !important; overflow: hidden !important; }
+  [data-export-page-id] { display: none !important; }
+  [data-export-page-id="${pageModel.id}"] { display: block !important; margin: 0 !important; }
+`;
+
+const mergePdfPages = async (pages: Buffer[]) => {
+  const output = await PDFDocument.create();
+  for (const bytes of pages) {
+    const source = await PDFDocument.load(bytes);
+    const copied = await output.copyPages(source, source.getPageIndices());
+    copied.forEach((page) => output.addPage(page));
+  }
+  return Buffer.from(await output.save({ useObjectStreams: false }));
+};
+
+const generatePdfDirect = async (
+  page: Page,
+  model: ExportRenderModel,
+  signal: AbortSignal
+) => {
+  await page.emulateMedia({ media: "print" });
+  const pdfPages: Buffer[] = [];
+  for (const pageModel of model.pages) {
+    throwIfAborted(signal);
+    const style = await page.addStyleTag({ content: pageOnlyCss(pageModel) });
+    try {
+      const bytes = await page.pdf({
+        width: `${pageModel.widthMm}mm`,
+        height: `${pageModel.heightMm}mm`,
+        printBackground: true,
+        margin: { top: "0", right: "0", bottom: "0", left: "0" },
+        preferCSSPageSize: true,
+      });
+      pdfPages.push(Buffer.from(bytes));
+    } finally {
+      await style.evaluate((element) => element.parentNode?.removeChild(element)).catch(() => undefined);
+    }
+  }
+  return mergePdfPages(pdfPages);
+};
+
+const generatePngsDirect = async (
+  page: Page,
+  model: ExportRenderModel,
+  dpi: 96 | 150 | 300,
+  signal: AbortSignal
+) => {
+  const images: Array<{ section: string; data: Buffer }> = [];
+  for (const pageModel of model.pages) {
+    throwIfAborted(signal);
+    const locator = page.locator(`[data-export-page-id="${pageModel.id}"]`);
+    if (await locator.count() !== 1) {
+      throw new ExportError(
+        422,
+        "EXPORT_RENDERER_OUTPUT_INVALID",
+        "The report renderer returned incomplete output",
+        { pageId: pageModel.id }
+      );
+    }
+    const screenshot = await locator.screenshot({
+      type: "png",
+      animations: "disabled",
+      caret: "hide",
+    });
+    const pixelWidth = Math.round((pageModel.widthMm / 25.4) * dpi);
+    const pixelHeight = Math.round((pageModel.heightMm / 25.4) * dpi);
+    const data = await sharp(screenshot)
+      .resize(pixelWidth, pixelHeight, { fit: "fill" })
+      .png({ compressionLevel: 9 })
+      .withMetadata({ density: dpi })
+      .toBuffer();
+    images.push({ section: pageModel.section, data });
+  }
+  return images;
+};
+
+export const generateExportWithSharedView = async (
+  model: ExportRenderModel,
+  request: CreateExportRequest,
+  rendererUrlValue: string,
+  timeoutMs: number,
+  signal: AbortSignal
+): Promise<GeneratedExport> => {
+  if (request.format === "excel") {
+    throw new ExportError(500, "EXPORT_RENDER_FAILED", "Invalid shared renderer format");
+  }
+  const scale = request.format === "png" ? request.pngDpi! / 96 : 1;
+  return withSharedView(
+    model,
+    rendererUrlValue,
+    timeoutMs,
+    signal,
+    scale,
+    async (page) => {
+      if (request.format === "pdf") {
+        return {
+          body: await generatePdfDirect(page, model, signal),
+          contentType: "application/pdf",
+          filename: `${request.baseFilename}.pdf`,
+        };
+      }
+
+      const images = await generatePngsDirect(page, model, request.pngDpi!, signal);
+      if (images.length === 1) {
+        return {
+          body: images[0]!.data,
+          contentType: "image/png",
+          filename: `${request.baseFilename}.png`,
+        };
+      }
+      const zip = new JSZip();
+      images.forEach(({ section, data }, index) => {
+        zip.file(
+          `${request.baseFilename}-${String(index + 1).padStart(2, "0")}-${section}.png`,
+          data
+        );
+      });
+      return {
+        body: await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }),
+        contentType: "application/zip",
+        filename: `${request.baseFilename}.zip`,
+      };
+    }
+  );
 };

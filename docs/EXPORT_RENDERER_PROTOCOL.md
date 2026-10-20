@@ -85,8 +85,11 @@ replaced by `RENDERER_REPORTED_ERROR` before they can appear in an API response.
 - Readiness timeout returns `504 EXPORT_RENDER_TIMEOUT`.
 - Client cancellation closes the browser context.
 
-Preview and PDF/PNG generation pass through this same adapter. Excel remains a
-backend-only `exceljs` export and does not invoke the shared renderer.
+Preview and PDF/PNG generation pass through this same adapter. Final PDFs are
+printed directly from each page DOM and merged without an intermediate raster
+HTML pass. PNG pages are captured directly at the requested DPI and packaged
+without launching another Chromium process. Excel remains a backend-only
+`exceljs` export and does not invoke the shared renderer.
 
 Preview responses include `rendererVersion`. When the shared renderer is
 enabled, the download request must return that exact value as

@@ -17,7 +17,7 @@ import {
   type RenderQuality,
 } from "./exports.render-cache";
 import { renderReport } from "./exports.renderer";
-import { renderWithSharedView } from "./exports.shared-renderer";
+import { generateExportWithSharedView, renderWithSharedView } from "./exports.shared-renderer";
 import {
   assertSectionsAvailable,
   getSectionAvailability,
@@ -164,16 +164,29 @@ export const createVisitExport = async (
   }
   assertSectionsAvailable(snapshot, request.sections);
 
-  const report =
-    request.format === "excel"
-      ? { pages: [], warnings: [] }
-      : (await renderVisitReportCached(
-          visitId,
-          userId,
-          snapshot,
-          request,
-          signal,
-          "export"
-        )).report;
+  if (request.format !== "excel" && env.EXPORT_RENDERER_URL) {
+    const assets = request.sections.includes("images")
+      ? await loadXrayAssetsForRender(snapshot, request.grayscale, signal)
+      : new Map<string, string>();
+    const model = buildExportRenderModel(snapshot, request, assets);
+    return generateExportWithSharedView(
+      model,
+      request,
+      env.EXPORT_RENDERER_URL,
+      env.EXPORT_RENDERER_READY_TIMEOUT_MS,
+      signal
+    );
+  }
+
+  const report = request.format === "excel"
+    ? { pages: [], warnings: [] }
+    : (await renderVisitReportCached(
+        visitId,
+        userId,
+        snapshot,
+        request,
+        signal,
+        "export"
+      )).report;
   return generateExport(snapshot, request, report.pages, signal);
 };
