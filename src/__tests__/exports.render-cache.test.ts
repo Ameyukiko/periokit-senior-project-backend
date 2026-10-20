@@ -77,5 +77,7 @@ describe("createRenderCacheKey", () => {
     expect(key({ snapshotVersion: "snapshot-b" })).not.toBe(baseline);
     expect(key({ quality: "export" })).not.toBe(baseline);
     expect(key({ request: request({ grayscale: true }) })).not.toBe(baseline);
+    expect(key({ request: request({ includePatientDetails: false }) })).not.toBe(baseline);
+    expect(key({ request: request({ includeImageNotes: true }) })).not.toBe(baseline);
   });
 });

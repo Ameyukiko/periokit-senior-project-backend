@@ -61,4 +61,29 @@ describe("Excel export", () => {
       contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
   });
+
+  it("omits patient and visit metadata when disabled", async () => {
+    const generated = await generateExport(
+      exportSnapshotFixture(),
+      {
+        format: "excel",
+        includePatientDetails: false,
+        sections: ["chart"],
+        paperSize: "a4",
+        orientations: {},
+        grayscale: false,
+        baseFilename: "anonymous-chart",
+        expectedSnapshotVersion: "a".repeat(43),
+      },
+      [],
+      new AbortController().signal
+    );
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(generated.body as any);
+    const chart = workbook.getWorksheet("Chart")!;
+    expect(chart.getCell("BA25").value).toBeNull();
+    expect(chart.getCell("BB25").value).toBeNull();
+    expect(chart.getCell("BB30").value).toBeNull();
+  });
 });

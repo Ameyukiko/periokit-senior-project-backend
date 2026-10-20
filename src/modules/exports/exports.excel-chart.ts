@@ -130,7 +130,11 @@ const formatPercent = (cell: ExcelJS.Cell, value: number | null | undefined) => 
   cell.numFmt = "0.00";
 };
 
-const renderSummary = (sheet: ExcelJS.Worksheet, snapshot: ExportSnapshot) => {
+const renderSummary = (
+  sheet: ExcelJS.Worksheet,
+  snapshot: ExportSnapshot,
+  includePatientDetails: boolean,
+) => {
   const chart = snapshot.chart;
   if (!chart) return;
   const present = chart.teeth.filter((tooth) => tooth.status !== "missing");
@@ -195,28 +199,31 @@ const renderSummary = (sheet: ExcelJS.Worksheet, snapshot: ExportSnapshot) => {
   sheet.getCell("BB22").value = "PI";
   formatPercent(sheet.getCell("BC22"), chart.summary?.plaquePercentage);
 
-  for (let row = 25; row <= 30; row += 1) sheet.mergeCells(row, 54, row, 57);
-  sheet.getCell("BA25").value = "HN";
-  sheet.getCell("BB25").value = snapshot.patient.hn;
-  sheet.getCell("BB25").numFmt = "@";
-  sheet.getCell("BA26").value = "Patient";
-  sheet.getCell("BB26").value = [snapshot.patient.firstName, snapshot.patient.lastName].filter(Boolean).join(" ");
-  sheet.getCell("BA27").value = "Visit date";
-  sheet.getCell("BB27").value = snapshot.visit.date;
-  sheet.getCell("BA28").value = "Phase";
-  sheet.getCell("BB28").value = snapshot.visit.phase;
-  sheet.getCell("BA29").value = "Doctor";
-  sheet.getCell("BB29").value = snapshot.visit.doctorName ?? "";
-  sheet.getCell("BA30").value = "Doctor ID";
-  sheet.getCell("BB30").value = snapshot.visit.studentId ?? "";
-  forCells(sheet, 25, 53, 30, 53, (cell) => {
-    cell.font = { name: "Arial", size: 10, bold: true };
-  });
+  if (includePatientDetails) {
+    for (let row = 25; row <= 30; row += 1) sheet.mergeCells(row, 54, row, 57);
+    sheet.getCell("BA25").value = "HN";
+    sheet.getCell("BB25").value = snapshot.patient.hn;
+    sheet.getCell("BB25").numFmt = "@";
+    sheet.getCell("BA26").value = "Patient";
+    sheet.getCell("BB26").value = [snapshot.patient.firstName, snapshot.patient.lastName].filter(Boolean).join(" ");
+    sheet.getCell("BA27").value = "Visit date";
+    sheet.getCell("BB27").value = snapshot.visit.date;
+    sheet.getCell("BA28").value = "Phase";
+    sheet.getCell("BB28").value = snapshot.visit.phase;
+    sheet.getCell("BA29").value = "Doctor";
+    sheet.getCell("BB29").value = snapshot.visit.doctorName ?? "";
+    sheet.getCell("BA30").value = "Doctor ID";
+    sheet.getCell("BB30").value = snapshot.visit.studentId ?? "";
+    forCells(sheet, 25, 53, 30, 53, (cell) => {
+      cell.font = { name: "Arial", size: 10, bold: true };
+    });
+  }
 }
 
 export const buildClinicalChartWorksheet = (
   workbook: ExcelJS.Workbook,
   snapshot: ExportSnapshot,
+  includePatientDetails = true,
 ) => {
   const sheet = workbook.addWorksheet("Chart", {
     views: [{ zoomScale: 90, showGridLines: false }],
@@ -327,7 +334,7 @@ export const buildClinicalChartWorksheet = (
   }
   forCells(sheet, 9, 2, 9, 51, (cell) => { cell.font = { name: "Arial", size: 14, bold: true }; });
   forCells(sheet, 23, 2, 23, 51, (cell) => { cell.font = { name: "Arial", size: 14, bold: true }; });
-  renderSummary(sheet, snapshot);
+  renderSummary(sheet, snapshot, includePatientDetails);
   sheet.autoFilter = undefined;
   sheet.pageSetup.printArea = "B2:BH30";
   return sheet;

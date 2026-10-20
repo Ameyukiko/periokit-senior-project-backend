@@ -120,7 +120,11 @@ const renderPngs = async (
     return images;
   }, { javaScriptEnabled: false, deviceScaleFactor: dpi / 96 });
 
-const generateExcel = async (snapshot: ExportSnapshot, signal: AbortSignal) => {
+const generateExcel = async (
+  snapshot: ExportSnapshot,
+  signal: AbortSignal,
+  includePatientDetails: boolean,
+) => {
   throwIfAborted(signal);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "PerioKit";
@@ -128,7 +132,7 @@ const generateExcel = async (snapshot: ExportSnapshot, signal: AbortSignal) => {
   workbook.modified = new Date(0);
   workbook.calcProperties.fullCalcOnLoad = true;
 
-  buildClinicalChartWorksheet(workbook, snapshot);
+  buildClinicalChartWorksheet(workbook, snapshot, includePatientDetails);
 
   throwIfAborted(signal);
   return Buffer.from(await workbook.xlsx.writeBuffer());
@@ -144,7 +148,7 @@ export const generateExport = async (
   if (request.format === "pdf") {
     body = await generatePdf(pages, signal);
   } else if (request.format === "excel") {
-    body = await generateExcel(snapshot, signal);
+    body = await generateExcel(snapshot, signal, request.includePatientDetails !== false);
   } else {
     const images = await renderPngs(pages, request.pngDpi!, signal);
     if (images.length === 1) {

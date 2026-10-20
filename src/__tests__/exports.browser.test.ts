@@ -67,7 +67,8 @@ describe("Chromium export smoke tests", () => {
     const snapshot = exportSnapshotFixture();
     const request: CreateExportRequest = {
       format: "png",
-      sections: ["notes", "imageNotes"],
+      includeImageNotes: true,
+      sections: ["chart", "notes", "imageNotes"],
       paperSize: "a4",
       orientations: {},
       grayscale: true,
@@ -86,8 +87,8 @@ describe("Chromium export smoke tests", () => {
 
     expect(generated.filename).toBe("report.zip");
     expect(Object.keys(zip.files)).toEqual([
-      "report-01-notes.png",
-      "report-02-imageNotes.png",
+      "report-01-chart.png",
+      "report-02-notes.png",
     ]);
   }, 30000);
 });

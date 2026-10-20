@@ -46,6 +46,61 @@ describe("export renderer", () => {
     }
   });
 
+  it("omits patient and visit details when disabled", () => {
+    const report = renderReport(
+      exportSnapshotFixture(),
+      {
+        format: "pdf",
+        includePatientDetails: false,
+        sections: ["chart"],
+        paperSize: "a4",
+        orientations: {},
+        grayscale: false,
+        baseFilename: "report",
+      },
+      new Map(),
+      "2026-10-19T07:00:00.000Z"
+    );
+
+    expect(report.pages[0].html).not.toContain("HN 00123");
+    expect(report.pages[0].html).not.toContain("Visit 2026-10-19");
+    expect(report.pages[0].html).toContain("PerioKit");
+  });
+
+  it("keeps X-ray notes on the image page without creating a separate page", () => {
+    const snapshot = exportSnapshotFixture();
+    const withNotes = renderReport(
+      snapshot,
+      {
+        format: "pdf",
+        includeImageNotes: true,
+        sections: ["images", "imageNotes"],
+        paperSize: "a4",
+        orientations: {},
+        grayscale: false,
+        baseFilename: "report",
+      },
+      new Map()
+    );
+    const withoutNotes = renderReport(
+      snapshot,
+      {
+        format: "pdf",
+        includeImageNotes: false,
+        sections: ["images"],
+        paperSize: "a4",
+        orientations: {},
+        grayscale: false,
+        baseFilename: "report",
+      },
+      new Map()
+    );
+
+    expect(withNotes.pages.map((page) => page.section)).toEqual(["images"]);
+    expect(withNotes.pages[0].html).toContain("X-ray note");
+    expect(withoutNotes.pages[0].html).not.toContain("X-ray note");
+  });
+
   it("escapes all database text and renders deterministically", () => {
     const snapshot = exportSnapshotFixture();
     snapshot.patient.firstName = '<script>alert("x")</script>';

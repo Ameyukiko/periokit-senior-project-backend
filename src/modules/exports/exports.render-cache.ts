@@ -82,6 +82,9 @@ export const createRenderCacheKey = (input: {
 }) => {
   const visualOptions = {
     sections: input.request.sections,
+    includePatientDetails: input.request.includePatientDetails !== false,
+    includeImageNotes: input.request.includeImageNotes
+      ?? input.request.sections.includes("imageNotes"),
     paperSize: input.request.paperSize,
     orientations: input.request.orientations,
     grayscale: input.request.grayscale,

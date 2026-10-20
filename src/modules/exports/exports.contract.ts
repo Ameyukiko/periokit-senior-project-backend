@@ -61,6 +61,8 @@ const sanitizeBaseFilename = (value: string) => {
 const requestSchema = z
   .object({
     format: z.enum(["pdf", "png", "excel"]),
+    includePatientDetails: z.boolean().optional(),
+    includeImageNotes: z.boolean().optional(),
     sections: z
       .array(sectionSchema)
       .min(1, "Select at least one export section")

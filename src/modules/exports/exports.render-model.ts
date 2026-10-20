@@ -40,6 +40,8 @@ export type ExportRenderModel = {
     format: PreviewExportRequest["format"];
     paperSize: PaperSize;
     grayscale: boolean;
+    includePatientDetails: boolean;
+    includeImageNotes: boolean;
   };
   pages: ExportRenderPageModel[];
   patient: Pick<
@@ -75,8 +77,9 @@ export const buildExportRenderModel = (
   assets: ExportAssetMap,
   generatedAt = new Date().toISOString()
 ): ExportRenderModel => {
-  const pageCount = request.sections.length;
-  const pages = request.sections.map((section, index) => {
+  const sections = request.sections.filter((section) => section !== "imageNotes");
+  const pageCount = sections.length;
+  const pages = sections.map((section, index) => {
     const orientation = request.orientations[section] ?? defaultOrientation(section);
     const dimensions = pageDimensions(request.paperSize, orientation);
     return {
@@ -99,6 +102,8 @@ export const buildExportRenderModel = (
       format: request.format,
       paperSize: request.paperSize,
       grayscale: request.grayscale,
+      includePatientDetails: request.includePatientDetails !== false,
+      includeImageNotes: request.includeImageNotes ?? request.sections.includes("imageNotes"),
     },
     pages,
     patient: {

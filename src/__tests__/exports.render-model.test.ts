@@ -19,7 +19,8 @@ describe("export render model", () => {
     });
     const request: PreviewExportRequest = {
       format: "pdf",
-      sections: ["chart", "images"],
+      includeImageNotes: true,
+      sections: ["chart", "images", "imageNotes"],
       paperSize: "a4",
       orientations: { chart: "portrait", images: "landscape" },
       grayscale: false,
@@ -37,7 +38,7 @@ describe("export render model", () => {
       protocolVersion: "1.0",
       snapshotVersion: snapshot.snapshotVersion,
       generatedAt: "2026-10-19T07:00:00.000Z",
-      options: { format: "pdf", paperSize: "a4", grayscale: false },
+      options: { format: "pdf", paperSize: "a4", grayscale: false, includeImageNotes: true },
       patient: { hn: "00123" },
       pages: [
         { id: "1-chart", widthMm: 210, heightMm: 297, orientation: "portrait" },
