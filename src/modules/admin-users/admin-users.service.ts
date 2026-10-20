@@ -151,16 +151,16 @@ export const changeAdminUserLifecycle = async (
       }
 
       const now = new Date();
-      const data: Prisma.public_usersUpdateInput = action === "deactivate"
+      const data: Prisma.public_usersUncheckedUpdateInput = action === "deactivate"
         ? { is_active: false }
         : action === "reactivate"
           ? { is_active: true }
           : action === "delete"
-            ? { is_active: false, is_deleted: true, deleted_at: now, deleted_by_user: { connect: { user_id: currentActor.user_id } } }
-            : { is_active: false, is_deleted: false, deleted_at: null, deleted_by_user: { disconnect: true } };
+            ? { is_active: false, is_deleted: true, deleted_at: now, deleted_by: currentActor.user_id }
+            : { is_active: false, is_deleted: false, deleted_at: null, deleted_by: null };
       const updated = await tx.public_users.update({
         where: { user_id: targetId },
-        data: { ...data, updated_by_user: { connect: { user_id: currentActor.user_id } }, updated_at: now },
+        data: { ...data, updated_by: currentActor.user_id, updated_at: now },
       });
       await writeAudit(tx, currentActor, target, updated, lifecycleAuditActions[action], requestId);
       return serializeUser(updated);
