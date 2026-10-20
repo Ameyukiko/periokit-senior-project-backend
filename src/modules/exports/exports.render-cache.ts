@@ -81,7 +81,6 @@ export const createRenderCacheKey = (input: {
   request: PreviewExportRequest;
 }) => {
   const visualOptions = {
-    format: input.request.format,
     sections: input.request.sections,
     paperSize: input.request.paperSize,
     orientations: input.request.orientations,

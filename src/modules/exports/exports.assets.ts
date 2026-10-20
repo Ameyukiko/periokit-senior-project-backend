@@ -3,6 +3,7 @@ import { env } from "../../lib/env";
 import { supabaseAdmin } from "../../lib/supabase";
 import { ExportError, throwIfAborted } from "./exports.errors";
 import type { ExportSnapshot } from "./exports.snapshot";
+import { mapWithConcurrency } from "./exports.concurrent";
 
 export type ExportAssetMap = Map<string, string>;
 
@@ -50,7 +51,7 @@ export const loadXrayAssetsForRender = async (
 
   const rendered = new Map<string, string>();
   let downloadedBytes = 0;
-  for (const assetId of referencedIds) {
+  await mapWithConcurrency(referencedIds, env.EXPORT_ASSET_CONCURRENCY, async (assetId) => {
     throwIfAborted(signal);
     const asset = byId.get(assetId)!;
     const { data, error } = await supabaseAdmin.storage
@@ -100,7 +101,7 @@ export const loadXrayAssetsForRender = async (
         { assetId }
       );
     }
-  }
+  });
 
   throwIfAborted(signal);
   return rendered;

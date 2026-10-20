@@ -37,6 +37,19 @@ describe("export request contract", () => {
     ).toBe(false);
   });
 
+  it.each([
+    "a3", "a4", "a5", "b4", "b5", "jis-b4", "jis-b5",
+    "letter", "legal", "tabloid", "executive",
+  ])("accepts the frontend paper size %s", (paperSize) => {
+    expect(
+      previewExportRequestSchema.safeParse({
+        format: "pdf",
+        sections: ["chart"],
+        paperSize,
+      }).success
+    ).toBe(true);
+  });
+
   it("rejects duplicate sections and invalid snapshot versions", () => {
     expect(
       previewExportRequestSchema.safeParse({

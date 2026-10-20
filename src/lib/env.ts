@@ -19,6 +19,7 @@ const envSchema = z.object({
   EXPORT_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300000).default(60000),
   EXPORT_MAX_PAGES: z.coerce.number().int().min(1).max(20).default(6),
   EXPORT_MAX_ASSETS: z.coerce.number().int().min(1).max(100).default(30),
+  EXPORT_ASSET_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(3),
   EXPORT_MAX_SOURCE_BYTES: z.coerce
     .number()
     .int()

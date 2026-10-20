@@ -64,8 +64,10 @@ describe("createRenderCacheKey", () => {
       ...overrides,
     });
 
-  it("ignores filename and PNG DPI because they do not change rendered pixels", () => {
-    expect(key()).toBe(key({ request: request({ baseFilename: "other", pngDpi: 300 }) }));
+  it("ignores download-only options because they do not change rendered pixels", () => {
+    expect(key()).toBe(key({
+      request: request({ format: "png", baseFilename: "other", pngDpi: 300 }),
+    }));
   });
 
   it("isolates cache entries by user, visit, snapshot, quality, and visual options", () => {

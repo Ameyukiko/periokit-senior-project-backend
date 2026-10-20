@@ -66,12 +66,15 @@ const renderVisitReportCached = async (
   quality: RenderQuality
 ) => {
   const rendererVersion = currentRendererVersion();
+  // The legacy renderer emits identical HTML for preview and export. Sharing
+  // that cache entry avoids downloading and resizing the same images twice.
+  const cacheQuality = env.EXPORT_RENDERER_URL ? quality : "preview";
   const cacheKey = createRenderCacheKey({
     visitId,
     userId,
     snapshotVersion: snapshot.snapshotVersion,
     rendererVersion,
-    quality,
+    quality: cacheQuality,
     request,
   });
   const cached = exportRenderCache.get(cacheKey);

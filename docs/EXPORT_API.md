@@ -27,7 +27,8 @@ Allowed values:
 
 - `format`: `pdf`, `png`, `excel`
 - `sections`: `chart`, `diagnosis`, `images`, `imageNotes`, `notes`
-- `paperSize`: `a4`, `letter`, `legal`
+- `paperSize`: `a3`, `a4`, `a5`, `b4`, `b5`, `jis-b4`, `jis-b5`,
+  `letter`, `legal`, `tabloid`, `executive`
 - orientation: `portrait`, `landscape`
 - `pngDpi`: required for PNG and must be `96`, `150`, or `300`; omit for PDF/Excel
 
